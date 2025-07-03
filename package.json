@@ -1,0 +1,26 @@
+{
+  "name": "modelshift",
+  "version": "1.0.0",
+  "description": "AI API key shifter - Full-stack AI wrapper web app",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm start",
+    "build": "cd client && npm run build",
+    "install-all": "npm install && cd server && npm install && cd ../client && npm install",
+    "start": "cd server && npm start"
+  },
+  "keywords": [
+    "ai",
+    "chatbot",
+    "api",
+    "wrapper",
+    "firebase"
+  ],
+  "author": "modelShift",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
