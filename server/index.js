@@ -86,13 +86,7 @@ app.use((req, res, next) => {
 
 // Routes
 app.use("/api/auth", authRoutes);
-app.use(
-  "/api/chat",
-  authMiddleware,
-  abuseDetection,
-  modelRateLimiting,
-  apiRoutes
-);
+app.use("/api", apiRoutes);
 
 // Health check endpoint
 app.get("/health", (req, res) => {

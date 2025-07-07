@@ -106,8 +106,11 @@ router.post(
       const { name, key, provider, model } = req.body;
 
       // Encrypt the API key
-      const encryptedKey = encrypt(key);
-      if (!encryptedKey) {
+      let encryptedKey;
+      try {
+        encryptedKey = encrypt(key);
+      } catch (error) {
+        console.error("Encryption error:", error);
         return res.status(500).json({
           error: "Encryption Error",
           message: "Failed to encrypt API key",
@@ -177,17 +180,24 @@ router.get("/api-keys", authenticateToken, async (req, res) => {
     const userData = userDoc.data();
     const apiKeys = userData.apiKeys || [];
 
-    // Return keys without encrypted data
-    const safeKeys = apiKeys.map((key) => ({
-      id: key.id,
-      name: key.name,
-      provider: key.provider,
-      model: key.model,
-      isActive: key.isActive,
-      createdAt: key.createdAt,
-      lastUsed: key.lastUsed,
-      usageStats: key.usageStats,
-    }));
+    // Import rate limits function
+    const { getModelRateLimits } = require("../config/rateLimits");
+
+    // Return keys without encrypted data, including rate limits
+    const safeKeys = apiKeys.map((key) => {
+      const rateLimits = getModelRateLimits(key.provider, key.model);
+      return {
+        id: key.id,
+        name: key.name,
+        provider: key.provider,
+        model: key.model,
+        isActive: key.isActive,
+        createdAt: key.createdAt,
+        lastUsed: key.lastUsed,
+        usageStats: key.usageStats,
+        rateLimits: rateLimits,
+      };
+    });
 
     res.json({ apiKeys: safeKeys });
   } catch (error) {
@@ -329,13 +339,13 @@ router.delete("/api-keys/:keyId", authenticateToken, async (req, res) => {
 function getDefaultModel(provider) {
   switch (provider) {
     case "openai":
-      return "gpt-4";
+      return "gpt-4o";
     case "gemini":
-      return "gemini-pro";
+      return "gemini-2.0-flash";
     case "claude":
-      return "claude-3-sonnet";
+      return "claude-3-5-sonnet-20241022";
     default:
-      return "gpt-4";
+      return "gpt-4o";
   }
 }
 

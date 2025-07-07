@@ -142,7 +142,7 @@ export function AuthProvider({ children }) {
     handleRedirectResult();
 
     return unsubscribe;
-  }, []);
+  }, [verifyUser]);
 
   const value = {
     currentUser,

@@ -14,12 +14,94 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
 
   const providers = [
-    { value: "openai", label: "OpenAI", defaultModel: "gpt-4" },
-    { value: "gemini", label: "Google Gemini", defaultModel: "gemini-pro" },
+    { value: "openai", label: "OpenAI", defaultModel: "gpt-4o" },
+    {
+      value: "gemini",
+      label: "Google Gemini",
+      defaultModel: "gemini-2.0-flash",
+    },
     {
       value: "claude",
       label: "Anthropic Claude",
-      defaultModel: "claude-3-sonnet-20240229",
+      defaultModel: "claude-3-5-sonnet-20241022",
+    },
+  ];
+
+  // OpenAI models with descriptions
+  const openaiModels = [
+    {
+      value: "gpt-4o",
+      label: "GPT-4o",
+      description: "Latest and most capable model, best for complex tasks",
+    },
+    {
+      value: "gpt-4o-mini",
+      label: "GPT-4o Mini",
+      description: "Fast and efficient, great for most use cases",
+    },
+    {
+      value: "gpt-4-turbo",
+      label: "GPT-4 Turbo",
+      description: "Previous generation, still very capable",
+    },
+    { value: "gpt-4", label: "GPT-4", description: "Classic GPT-4 model" },
+    {
+      value: "gpt-3.5-turbo",
+      label: "GPT-3.5 Turbo",
+      description: "Fast and cost-effective",
+    },
+    {
+      value: "gpt-3.5-turbo-16k",
+      label: "GPT-3.5 Turbo 16K",
+      description: "Extended context window",
+    },
+  ];
+
+  // Gemini models with descriptions
+  const geminiModels = [
+    {
+      value: "gemini-2.0-flash",
+      label: "Gemini 2.0 Flash",
+      description: "15 requests/min, 1500 requests/day",
+    },
+    {
+      value: "gemini-2.0-flash-lite",
+      label: "Gemini 2.0 Flash Lite",
+      description: "30 requests/min, 1500 requests/day",
+    },
+    {
+      value: "gemini-2.5-flash",
+      label: "Gemini 2.5 Flash",
+      description: "10 requests/min, 500 requests/day",
+    },
+  ];
+
+  // Claude models with descriptions
+  const claudeModels = [
+    {
+      value: "claude-3-5-sonnet-20241022",
+      label: "Claude 3.5 Sonnet",
+      description: "Latest and most capable Claude model",
+    },
+    {
+      value: "claude-3-5-haiku-20241022",
+      label: "Claude 3.5 Haiku",
+      description: "Fast and efficient for most tasks",
+    },
+    {
+      value: "claude-3-opus-20240229",
+      label: "Claude 3 Opus",
+      description: "Most powerful model for complex reasoning",
+    },
+    {
+      value: "claude-3-sonnet-20240229",
+      label: "Claude 3 Sonnet",
+      description: "Balanced performance and speed",
+    },
+    {
+      value: "claude-3-haiku-20240307",
+      label: "Claude 3 Haiku",
+      description: "Fastest model for simple tasks",
     },
   ];
 
@@ -58,6 +140,80 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
       provider,
       model: providers.find((p) => p.value === provider)?.defaultModel || "",
     }));
+  };
+
+  const getModelsForProvider = (provider) => {
+    switch (provider) {
+      case "openai":
+        return openaiModels;
+      case "gemini":
+        return geminiModels;
+      case "claude":
+        return claudeModels;
+      default:
+        return [];
+    }
+  };
+
+  const renderModelField = () => {
+    const models = getModelsForProvider(formData.provider);
+
+    if (models.length > 0) {
+      return (
+        <div>
+          <label
+            htmlFor="model"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Model *
+          </label>
+          <select
+            id="model"
+            value={formData.model}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, model: e.target.value }))
+            }
+            className="input-field"
+          >
+            {models.map((model) => (
+              <option key={model.value} value={model.value}>
+                {model.label}
+              </option>
+            ))}
+          </select>
+          {formData.model && (
+            <p className="text-xs text-gray-500 mt-1">
+              {models.find((m) => m.value === formData.model)?.description}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <label
+          htmlFor="model"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
+          Model
+        </label>
+        <input
+          type="text"
+          id="model"
+          value={formData.model}
+          onChange={(e) =>
+            setFormData((prev) => ({ ...prev, model: e.target.value }))
+          }
+          className="input-field"
+          placeholder="Enter model name"
+          maxLength={50}
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Leave empty to use the default model for the selected provider
+        </p>
+      </div>
+    );
   };
 
   return (
@@ -117,29 +273,8 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
             </select>
           </div>
 
-          {/* Model */}
-          <div>
-            <label
-              htmlFor="model"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Model
-            </label>
-            <input
-              type="text"
-              id="model"
-              value={formData.model}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, model: e.target.value }))
-              }
-              className="input-field"
-              placeholder="e.g., gpt-4, gemini-pro"
-              maxLength={50}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Leave empty to use the default model for the selected provider
-            </p>
-          </div>
+          {/* Model - Dynamic based on provider */}
+          {renderModelField()}
 
           {/* API Key */}
           <div>
@@ -185,16 +320,19 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 btn-secondary"
+              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg font-medium transition-colors duration-200"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={
-                loading || !formData.name.trim() || !formData.key.trim()
+                loading ||
+                !formData.name.trim() ||
+                !formData.key.trim() ||
+                !formData.model.trim()
               }
-              className="flex-1 btn-primary"
+              className="flex-1 px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed border border-blue-600 hover:border-blue-700 rounded-lg font-medium transition-colors duration-200"
             >
               {loading ? (
                 <div className="loading-dots">

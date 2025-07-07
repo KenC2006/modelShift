@@ -10,14 +10,14 @@ if (!ENCRYPTION_KEY) {
 // Convert base64 key to buffer
 const keyBuffer = Buffer.from(ENCRYPTION_KEY, "base64");
 
-// Validate key length (should be 24 bytes for AES-192, or 32 bytes for AES-256)
-if (keyBuffer.length !== 24 && keyBuffer.length !== 32) {
+// Validate key length (should be 32 bytes for AES-256)
+if (keyBuffer.length !== 32) {
   throw new Error(
-    "ENCRYPTION_KEY must be 24 bytes (192 bits) or 32 bytes (256 bits) when base64 decoded"
+    "ENCRYPTION_KEY must be 32 bytes (256 bits) when base64 decoded"
   );
 }
 
-const ALGORITHM = "aes-192-cbc";
+const ALGORITHM = "aes-256-cbc";
 
 /**
  * Encrypt a string using AES-256-CBC
@@ -32,7 +32,7 @@ function encrypt(text) {
     const iv = crypto.randomBytes(16);
 
     // Create cipher
-    const cipher = crypto.createCipher(ALGORITHM, keyBuffer);
+    const cipher = crypto.createCipheriv(ALGORITHM, keyBuffer, iv);
 
     // Encrypt the text
     let encrypted = cipher.update(text, "utf8", "hex");
@@ -45,7 +45,7 @@ function encrypt(text) {
     return Buffer.from(result).toString("base64");
   } catch (error) {
     console.error("Encryption error:", error);
-    return null;
+    throw new Error("Failed to encrypt API key");
   }
 }
 
@@ -69,7 +69,7 @@ function decrypt(encryptedText) {
     const encrypted = parts[1];
 
     // Create decipher
-    const decipher = crypto.createDecipher(ALGORITHM, keyBuffer);
+    const decipher = crypto.createDecipheriv(ALGORITHM, keyBuffer, iv);
 
     // Decrypt the text
     let decrypted = decipher.update(encrypted, "hex", "utf8");
@@ -78,7 +78,7 @@ function decrypt(encryptedText) {
     return decrypted;
   } catch (error) {
     console.error("Decryption error:", error);
-    return null;
+    throw new Error("Failed to decrypt API key");
   }
 }
 

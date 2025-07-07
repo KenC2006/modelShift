@@ -1,303 +1,285 @@
-import React, { useState, useEffect } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import {
-  Plus,
-  Edit,
-  Trash2,
-  ToggleLeft,
-  ToggleRight,
-  BarChart3,
-  Zap,
-  Clock,
-  AlertCircle,
-} from "lucide-react";
-import axios from "axios";
-import toast from "react-hot-toast";
-import AddKeyModal from "./AddKeyModal";
-import EditKeyModal from "./EditKeyModal";
+import React from "react";
+import { useComparisonSettings } from "../contexts/ComparisonSettingsContext";
+import { Palette, Eye, RotateCcw, Zap, HelpCircle } from "lucide-react";
 
-const Settings = () => {
-  const { userData, refreshUserData } = useAuth();
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingKey, setEditingKey] = useState(null);
-  const [usageStats, setUsageStats] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    fetchUsageStats();
-  }, []);
-
-  const fetchUsageStats = async () => {
-    try {
-      const response = await axios.get("/api/chat/usage");
-      setUsageStats(response.data);
-    } catch (error) {
-      console.error("Error fetching usage stats:", error);
-    }
-  };
-
-  const handleDeleteKey = async (keyId) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this API key? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await axios.delete(`/api/auth/api-keys/${keyId}`);
-      await refreshUserData();
-      await fetchUsageStats();
-      toast.success("API key deleted successfully");
-    } catch (error) {
-      console.error("Error deleting API key:", error);
-      toast.error(error.response?.data?.message || "Failed to delete API key");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleToggleKey = async (keyId, isActive) => {
-    try {
-      setLoading(true);
-      await axios.put(`/api/auth/api-keys/${keyId}`, { isActive: !isActive });
-      await refreshUserData();
-      await fetchUsageStats();
-      toast.success(
-        `API key ${!isActive ? "activated" : "deactivated"} successfully`
-      );
-    } catch (error) {
-      console.error("Error toggling API key:", error);
-      toast.error(error.response?.data?.message || "Failed to update API key");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getProviderIcon = (provider) => {
-    switch (provider?.toLowerCase()) {
-      case "openai":
-        return "🤖";
-      case "gemini":
-        return "💎";
-      case "claude":
-        return "🧠";
-      default:
-        return "🔑";
-    }
-  };
-
-  const getProviderColor = (provider) => {
-    switch (provider?.toLowerCase()) {
-      case "openai":
-        return "text-green-600 bg-green-50";
-      case "gemini":
-        return "text-blue-600 bg-blue-50";
-      case "claude":
-        return "text-purple-600 bg-purple-50";
-      default:
-        return "text-gray-600 bg-gray-50";
-    }
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString();
-  };
-
-  const formatLastUsed = (dateString) => {
-    if (!dateString) return "Never";
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
-
-    if (diffInHours < 1) return "Just now";
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    return formatDate(dateString);
-  };
-
+// Toggle Switch Component
+const ToggleSwitch = ({
+  checked,
+  onChange,
+  label,
+  className = "",
+  description = "",
+}) => {
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600">
-          Manage your API keys and view usage statistics
-        </p>
-      </div>
-
-      {/* Usage Statistics */}
-      {usageStats && (
-        <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <BarChart3 className="h-5 w-5 mr-2" />
-            Usage Statistics
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex items-center">
-                <Zap className="h-5 w-5 text-primary-600 mr-2" />
-                <div>
-                  <p className="text-sm text-gray-600">Total Requests</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {usageStats.usageStats?.totalRequests || 0}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex items-center">
-                <Zap className="h-5 w-5 text-primary-600 mr-2" />
-                <div>
-                  <p className="text-sm text-gray-600">Total Tokens</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {usageStats.usageStats?.totalTokens || 0}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex items-center">
-                <Clock className="h-5 w-5 text-primary-600 mr-2" />
-                <div>
-                  <p className="text-sm text-gray-600">Last Request</p>
-                  <p className="text-sm font-medium text-gray-900">
-                    {usageStats.usageStats?.lastRequest
-                      ? formatLastUsed(usageStats.usageStats.lastRequest)
-                      : "Never"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* API Keys */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">API Keys</h2>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="btn-primary inline-flex items-center"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add API Key
-          </button>
-        </div>
-
-        {userData?.apiKeys && userData.apiKeys.length > 0 ? (
-          <div className="space-y-4">
-            {userData.apiKeys.map((key) => (
-              <div
-                key={key.id}
-                className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div
-                      className={`p-2 rounded-lg ${getProviderColor(
-                        key.provider
-                      )}`}
-                    >
-                      <span className="text-lg">
-                        {getProviderIcon(key.provider)}
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">{key.name}</h3>
-                      <p className="text-sm text-gray-600">
-                        {key.provider} • {key.model}
-                      </p>
-                      <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500">
-                        <span>Created: {formatDate(key.createdAt)}</span>
-                        <span>Last used: {formatLastUsed(key.lastUsed)}</span>
-                        <span>Requests: {key.usageStats?.requests || 0}</span>
-                        <span>Errors: {key.usageStats?.errors || 0}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => handleToggleKey(key.id, key.isActive)}
-                      disabled={loading}
-                      className={`p-2 rounded-lg transition-colors ${
-                        key.isActive
-                          ? "text-green-600 hover:bg-green-50"
-                          : "text-gray-400 hover:bg-gray-50"
-                      }`}
-                      title={key.isActive ? "Deactivate" : "Activate"}
-                    >
-                      {key.isActive ? (
-                        <ToggleRight className="h-5 w-5" />
-                      ) : (
-                        <ToggleLeft className="h-5 w-5" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setEditingKey(key)}
-                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                      title="Edit"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteKey(key.id)}
-                      disabled={loading}
-                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              No API Keys
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Add your first API key to start chatting with AI models.
-            </p>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="btn-primary inline-flex items-center"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Your First API Key
-            </button>
+    <div className={`flex items-center justify-between ${className}`}>
+      <div className="flex items-center space-x-2">
+        <label className="text-sm font-medium text-theme-text-secondary cursor-pointer">
+          {label}
+        </label>
+        {description && (
+          <div className="tooltip">
+            <HelpCircle className="h-4 w-4 text-theme-text-muted hover:text-theme-text-tertiary cursor-help" />
+            <div className="tooltip-content">{description}</div>
           </div>
         )}
       </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`toggle-switch ${checked ? "checked" : ""}`}
+      />
+    </div>
+  );
+};
 
-      {/* Modals */}
-      {showAddModal && (
-        <AddKeyModal
-          onClose={() => setShowAddModal(false)}
-          onSuccess={async () => {
-            await refreshUserData();
-            await fetchUsageStats();
-            setShowAddModal(false);
-          }}
-        />
-      )}
+const Settings = () => {
+  const { settings, updateSetting, resetSettings } = useComparisonSettings();
 
-      {editingKey && (
-        <EditKeyModal
-          key={editingKey}
-          onClose={() => setEditingKey(null)}
-          onSuccess={async () => {
-            await refreshUserData();
-            await fetchUsageStats();
-            setEditingKey(null);
-          }}
-        />
-      )}
+  return (
+    <div className="max-w-6xl mx-auto space-y-6 bg-theme-bg-secondary min-h-screen p-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-theme-text mb-2">Settings</h1>
+        <p className="text-theme-text-secondary">
+          Customize the look and feel of your AI comparison interface
+        </p>
+      </div>
+
+      {/* Theme Settings */}
+      <div className="card card-elevated">
+        <h2 className="text-xl font-semibold text-theme-text mb-6 flex items-center">
+          <Palette className="h-6 w-6 mr-3 text-primary-500" />
+          Theme & Appearance
+        </h2>
+
+        <div className="space-y-6">
+          <div>
+            <div className="flex items-center space-x-2 mb-3">
+              <label className="block text-sm font-medium text-theme-text-secondary">
+                Theme
+              </label>
+              <div className="tooltip">
+                <HelpCircle className="h-4 w-4 text-theme-text-muted hover:text-theme-text-tertiary cursor-help" />
+                <div className="tooltip-content">
+                  Choose between light, dark, or automatic theme based on system
+                  preference
+                </div>
+              </div>
+            </div>
+            <select
+              value={settings.theme}
+              onChange={(e) => updateSetting("theme", e.target.value)}
+              className="input-field"
+            >
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="auto">Auto</option>
+            </select>
+          </div>
+
+          <div>
+            <div className="flex items-center space-x-2 mb-3">
+              <label className="block text-sm font-medium text-theme-text-secondary">
+                Font Size
+              </label>
+              <div className="tooltip">
+                <HelpCircle className="h-4 w-4 text-theme-text-muted hover:text-theme-text-tertiary cursor-help" />
+                <div className="tooltip-content">
+                  Adjust the text size throughout the application for better
+                  readability
+                </div>
+              </div>
+            </div>
+            <select
+              value={settings.fontSize}
+              onChange={(e) => updateSetting("fontSize", e.target.value)}
+              className="input-field"
+            >
+              <option value="small">Small</option>
+              <option value="medium">Medium</option>
+              <option value="large">Large</option>
+            </select>
+          </div>
+
+          <ToggleSwitch
+            checked={settings.compactMode}
+            onChange={(checked) => updateSetting("compactMode", checked)}
+            label="Compact Mode"
+            description="Reduce spacing and padding for a more condensed layout"
+          />
+        </div>
+      </div>
+
+      {/* Display Settings */}
+      <div className="card card-elevated">
+        <h2 className="text-xl font-semibold text-theme-text mb-6 flex items-center">
+          <Eye className="h-6 w-6 mr-3 text-primary-500" />
+          Display Options
+        </h2>
+
+        <div className="space-y-4">
+          <ToggleSwitch
+            checked={settings.showTimestamps}
+            onChange={(checked) => updateSetting("showTimestamps", checked)}
+            label="Show Timestamps"
+            description="Display when messages were sent with clock icons"
+          />
+
+          <ToggleSwitch
+            checked={settings.showProviderInfo}
+            onChange={(checked) => updateSetting("showProviderInfo", checked)}
+            label="Show Provider Info"
+            description="Display AI provider names in message footers"
+          />
+
+          <ToggleSwitch
+            checked={settings.showTokenCount}
+            onChange={(checked) => updateSetting("showTokenCount", checked)}
+            label="Show Token Count"
+            description="Display token usage for each AI response"
+          />
+
+          <ToggleSwitch
+            checked={settings.markdownRendering}
+            onChange={(checked) => updateSetting("markdownRendering", checked)}
+            label="Markdown Rendering"
+            description="Render markdown formatting in AI responses (bold, italic, code, etc.)"
+          />
+        </div>
+      </div>
+
+      {/* AI Behavior Settings */}
+      <div className="card card-elevated">
+        <h2 className="text-xl font-semibold text-theme-text mb-6 flex items-center">
+          <Zap className="h-6 w-6 mr-3 text-primary-500" />
+          AI Behavior
+        </h2>
+
+        <div className="space-y-6">
+          <div>
+            <div className="flex items-center space-x-2 mb-3">
+              <label className="block text-sm font-medium text-theme-text-secondary">
+                System Prompt
+              </label>
+              <div className="tooltip">
+                <HelpCircle className="h-4 w-4 text-theme-text-muted hover:text-theme-text-tertiary cursor-help" />
+                <div className="tooltip-content">
+                  Custom instruction sent to AI models before your message
+                </div>
+              </div>
+            </div>
+            <textarea
+              value={settings.systemPrompt}
+              onChange={(e) => updateSetting("systemPrompt", e.target.value)}
+              rows={3}
+              className="input-field"
+              placeholder="Enter your system prompt..."
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center space-x-2 mb-3">
+              <label className="block text-sm font-medium text-theme-text-secondary">
+                Temperature: {settings.temperature}
+              </label>
+              <div className="tooltip">
+                <HelpCircle className="h-4 w-4 text-theme-text-muted hover:text-theme-text-tertiary cursor-help" />
+                <div className="tooltip-content">
+                  Control AI creativity: Lower = focused, Higher = creative
+                </div>
+              </div>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="2"
+              step="0.1"
+              value={settings.temperature}
+              onChange={(e) =>
+                updateSetting("temperature", parseFloat(e.target.value))
+              }
+              className="slider"
+            />
+            <div className="flex justify-between text-xs text-theme-text-muted mt-2">
+              <span>Focused</span>
+              <span>Balanced</span>
+              <span>Creative</span>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center space-x-2 mb-3">
+              <label className="block text-sm font-medium text-theme-text-secondary">
+                Max Tokens: {settings.maxTokens}
+              </label>
+              <div className="tooltip">
+                <HelpCircle className="h-4 w-4 text-theme-text-muted hover:text-theme-text-tertiary cursor-help" />
+                <div className="tooltip-content">
+                  Maximum length of AI responses (affects cost and response
+                  length)
+                </div>
+              </div>
+            </div>
+            <input
+              type="range"
+              min="100"
+              max="4000"
+              step="100"
+              value={settings.maxTokens}
+              onChange={(e) =>
+                updateSetting("maxTokens", parseInt(e.target.value))
+              }
+              className="slider"
+            />
+            <div className="flex justify-between text-xs text-theme-text-muted mt-2">
+              <span>100</span>
+              <span>2000</span>
+              <span>4000</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* UI Preferences */}
+      <div className="card card-elevated">
+        <h2 className="text-xl font-semibold text-theme-text mb-6 flex items-center">
+          <Eye className="h-6 w-6 mr-3 text-primary-500" />
+          UI Preferences
+        </h2>
+
+        <div className="space-y-4">
+          <ToggleSwitch
+            checked={settings.showWelcomeMessage}
+            onChange={(checked) => updateSetting("showWelcomeMessage", checked)}
+            label="Show Welcome Message"
+            description="Display helpful welcome screen for new users"
+          />
+
+          <ToggleSwitch
+            checked={settings.animations}
+            onChange={(checked) => updateSetting("animations", checked)}
+            label="Animations"
+            description="Enable smooth transitions and visual effects"
+          />
+
+          <ToggleSwitch
+            checked={settings.autoScroll}
+            onChange={(checked) => updateSetting("autoScroll", checked)}
+            label="Auto Scroll"
+            description="Automatically scroll to new messages when they arrive"
+          />
+        </div>
+      </div>
+
+      {/* Reset Button */}
+      <div className="card card-elevated">
+        <button onClick={resetSettings} className="btn btn-secondary w-full">
+          <RotateCcw className="h-4 w-4 mr-2" />
+          Reset to Defaults
+        </button>
+      </div>
     </div>
   );
 };

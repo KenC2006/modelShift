@@ -3,6 +3,8 @@ const { body, validationResult } = require("express-validator");
 const { db } = require("../config/firebase");
 const { decrypt } = require("../utils/encryption");
 const { getModelRateLimits } = require("../config/rateLimits");
+const authenticateToken = require("../middleware/auth");
+const modelRateLimiting = require("../middleware/modelRateLimiting");
 const OpenAI = require("openai");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
@@ -12,12 +14,25 @@ const router = express.Router();
 router.post(
   "/chat",
   [
+    authenticateToken,
+    modelRateLimiting,
     body("message")
       .trim()
-      .isLength({ min: 1, max: 4000 })
-      .withMessage("Message must be between 1 and 4000 characters"),
+      .isLength({ min: 1, max: 10000 })
+      .withMessage("Message must be between 1 and 10000 characters"),
     body("keyId").optional().isString().withMessage("Key ID must be a string"),
-    body("model").optional().isString().withMessage("Model must be a string"),
+    body("systemPrompt")
+      .optional()
+      .isString()
+      .withMessage("System prompt must be a string"),
+    body("temperature")
+      .optional()
+      .isFloat({ min: 0, max: 2 })
+      .withMessage("Temperature must be between 0 and 2"),
+    body("maxTokens")
+      .optional()
+      .isInt({ min: 100, max: 4000 })
+      .withMessage("Max tokens must be between 100 and 4000"),
   ],
   async (req, res) => {
     try {
@@ -29,7 +44,7 @@ router.post(
         });
       }
 
-      const { message, keyId, model } = req.body;
+      const { message, keyId, systemPrompt, temperature, maxTokens } = req.body;
       const userId = req.user.uid;
 
       // Get user's API keys
@@ -69,8 +84,11 @@ router.post(
       }
 
       // Decrypt the API key
-      const decryptedKey = decrypt(selectedKey.encryptedKey);
-      if (!decryptedKey) {
+      let decryptedKey;
+      try {
+        decryptedKey = decrypt(selectedKey.encryptedKey);
+      } catch (error) {
+        console.error("Decryption error:", error);
         return res.status(500).json({
           error: "Decryption Error",
           message: "Failed to decrypt API key",
@@ -80,7 +98,7 @@ router.post(
       // Use model limits from middleware or get them if not available
       const modelLimits =
         req.modelLimits ||
-        getModelRateLimits(selectedKey.provider, selectedKey.model || model);
+        getModelRateLimits(selectedKey.provider, selectedKey.model);
 
       // Make API call to the selected provider
       let response;
@@ -91,9 +109,16 @@ router.post(
         const result = await callAIProvider(
           selectedKey.provider,
           decryptedKey,
-          selectedKey.model || model,
+          selectedKey.model,
           message,
-          modelLimits
+          modelLimits,
+          {
+            systemPrompt:
+              systemPrompt ||
+              "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.",
+            temperature: temperature || 0.7,
+            maxTokens: maxTokens || 1000,
+          }
         );
         response = result.response;
         tokensUsed = result.tokens || 0;
@@ -108,19 +133,33 @@ router.post(
           const fallbackKey = selectBestKey(otherKeys);
 
           if (fallbackKey) {
-            const fallbackDecryptedKey = decrypt(fallbackKey.encryptedKey);
+            let fallbackDecryptedKey;
+            try {
+              fallbackDecryptedKey = decrypt(fallbackKey.encryptedKey);
+            } catch (error) {
+              console.error("Fallback decryption error:", error);
+              error = new Error("Failed to decrypt fallback API key");
+            }
+
             if (fallbackDecryptedKey) {
               try {
                 const fallbackModelLimits = getModelRateLimits(
                   fallbackKey.provider,
-                  fallbackKey.model || model
+                  fallbackKey.model
                 );
                 const fallbackResult = await callAIProvider(
                   fallbackKey.provider,
                   fallbackDecryptedKey,
-                  fallbackKey.model || model,
+                  fallbackKey.model,
                   message,
-                  fallbackModelLimits
+                  fallbackModelLimits,
+                  {
+                    systemPrompt:
+                      systemPrompt ||
+                      "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.",
+                    temperature: temperature || 0.7,
+                    maxTokens: maxTokens || 1000,
+                  }
                 );
                 response = fallbackResult.response;
                 tokensUsed = fallbackResult.tokens || 0;
@@ -167,7 +206,7 @@ router.get("/usage", async (req, res) => {
   try {
     const userId = req.user.uid;
     const userDoc = await db.collection("users").doc(userId).get();
-    const userData = userDoc.data();
+    const userData = userDoc.data() || {};
 
     res.json({
       usageStats: userData.usageStats || {
@@ -175,15 +214,19 @@ router.get("/usage", async (req, res) => {
         totalTokens: 0,
         lastRequest: null,
       },
-      apiKeys: (userData.apiKeys || []).map((key) => ({
-        id: key.id,
-        name: key.name,
-        provider: key.provider,
-        model: key.model,
-        isActive: key.isActive,
-        usageStats: key.usageStats,
-        lastUsed: key.lastUsed,
-      })),
+      apiKeys: (userData.apiKeys || []).map((key) => {
+        const rateLimits = getModelRateLimits(key.provider, key.model);
+        return {
+          id: key.id,
+          name: key.name,
+          provider: key.provider,
+          model: key.model,
+          isActive: key.isActive,
+          usageStats: key.usageStats,
+          lastUsed: key.lastUsed,
+          rateLimits: rateLimits,
+        };
+      }),
     });
   } catch (error) {
     console.error("Error getting usage stats:", error);
@@ -207,47 +250,82 @@ function selectBestKey(activeKeys) {
     }
 
     // Then prefer keys that haven't been used recently
-    const aLastUsed = a.lastUsed ? new Date(a.lastUsed).getTime() : 0;
-    const bLastUsed = b.lastUsed ? new Date(b.lastUsed).getTime() : 0;
+    const aLastUsed = a.lastUsed
+      ? a.lastUsed.toDate
+        ? a.lastUsed.toDate().getTime()
+        : new Date(a.lastUsed).getTime()
+      : 0;
+    const bLastUsed = b.lastUsed
+      ? b.lastUsed.toDate
+        ? b.lastUsed.toDate().getTime()
+        : new Date(b.lastUsed).getTime()
+      : 0;
 
     return aLastUsed - bLastUsed;
   })[0];
 }
 
 // Helper function to call AI providers
-async function callAIProvider(provider, apiKey, model, message, modelLimits) {
+async function callAIProvider(
+  provider,
+  apiKey,
+  model,
+  message,
+  modelLimits,
+  customSettings
+) {
   switch (provider) {
     case "openai":
-      return await callOpenAI(apiKey, model, message, modelLimits);
+      return await callOpenAI(
+        apiKey,
+        model,
+        message,
+        modelLimits,
+        customSettings
+      );
     case "gemini":
-      return await callGemini(apiKey, model, message, modelLimits);
+      return await callGemini(
+        apiKey,
+        model,
+        message,
+        modelLimits,
+        customSettings
+      );
     case "claude":
-      return await callClaude(apiKey, model, message, modelLimits);
+      return await callClaude(
+        apiKey,
+        model,
+        message,
+        modelLimits,
+        customSettings
+      );
     default:
       throw new Error(`Unsupported provider: ${provider}`);
   }
 }
 
-async function callOpenAI(apiKey, model, message, modelLimits) {
+async function callOpenAI(apiKey, model, message, modelLimits, customSettings) {
   const openai = new OpenAI({
     apiKey: apiKey,
   });
 
   const completion = await openai.chat.completions.create({
-    model: model || "gpt-4",
+    model: model || "gpt-4o",
     messages: [
       {
         role: "system",
-        content:
-          "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.",
+        content: customSettings.systemPrompt,
       },
       {
         role: "user",
         content: message,
       },
     ],
-    max_tokens: Math.min(1000, modelLimits.maxTokensPerRequest),
-    temperature: 0.7,
+    max_tokens: Math.min(
+      customSettings.maxTokens,
+      modelLimits.maxTokensPerRequest
+    ),
+    temperature: customSettings.temperature,
   });
 
   return {
@@ -256,10 +334,17 @@ async function callOpenAI(apiKey, model, message, modelLimits) {
   };
 }
 
-async function callGemini(apiKey, model, message, modelLimits) {
+async function callGemini(apiKey, model, message, modelLimits, customSettings) {
   const genAI = new GoogleGenerativeAI(apiKey);
   const geminiModel = genAI.getGenerativeModel({
-    model: model || "gemini-pro",
+    model: model || "gemini-2.0-flash",
+    generationConfig: {
+      temperature: customSettings?.temperature || 0.7,
+      maxOutputTokens: Math.min(
+        customSettings?.maxTokens || 1000,
+        modelLimits.maxTokensPerRequest
+      ),
+    },
   });
 
   const result = await geminiModel.generateContent(message);
@@ -272,7 +357,7 @@ async function callGemini(apiKey, model, message, modelLimits) {
   };
 }
 
-async function callClaude(apiKey, model, message, modelLimits) {
+async function callClaude(apiKey, model, message, modelLimits, customSettings) {
   // Note: Claude API requires different implementation
   // This is a placeholder - you'll need to implement Claude API calls
   throw new Error("Claude API not yet implemented");
