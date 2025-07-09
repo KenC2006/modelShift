@@ -8,32 +8,26 @@ export function useChatSettings() {
 
 export function ChatSettingsProvider({ children }) {
   const [settings, setSettings] = useState({
-    // Theme settings
-    theme: "light", // light, dark, auto
-    colorScheme: "blue", // blue, purple, green, orange, pink, gray
+    theme: "light",
+    colorScheme: "blue",
 
-    // Chat appearance
-    messageBubbleStyle: "rounded", // rounded, sharp, minimal
-    fontSize: "medium", // small, medium, large
+    messageBubbleStyle: "rounded",
+    fontSize: "medium",
     compactMode: false,
     showTimestamps: true,
     showAvatars: true,
     showMetadata: true,
     showMessageActions: true,
 
-    // Input settings
     autoResize: true,
     placeholderText: "Type your message...",
     enterToSend: true,
     shiftEnterToNewLine: true,
 
-    // AI behavior
     systemPrompt:
       "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.",
     temperature: 0.7,
-    maxTokens: 1000,
 
-    // UI preferences
     showWelcomeMessage: true,
     animations: true,
     soundEffects: false,
@@ -41,20 +35,16 @@ export function ChatSettingsProvider({ children }) {
     enableMarkdown: true,
   });
 
-  // Load settings from localStorage
   useEffect(() => {
     const savedSettings = localStorage.getItem("chatSettings");
     if (savedSettings) {
       try {
         const parsed = JSON.parse(savedSettings);
         setSettings((prev) => ({ ...prev, ...parsed }));
-      } catch (error) {
-        console.error("Error loading chat settings:", error);
-      }
+      } catch (error) {}
     }
   }, []);
 
-  // Save settings to localStorage
   useEffect(() => {
     localStorage.setItem("chatSettings", JSON.stringify(settings));
   }, [settings]);
@@ -85,7 +75,6 @@ export function ChatSettingsProvider({ children }) {
       systemPrompt:
         "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.",
       temperature: 0.7,
-      maxTokens: 1000,
       showWelcomeMessage: true,
       animations: true,
       soundEffects: false,

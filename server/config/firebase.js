@@ -1,6 +1,5 @@
 const admin = require("firebase-admin");
 
-// Initialize Firebase Admin SDK
 const serviceAccount = {
   type: "service_account",
   project_id: process.env.FIREBASE_PROJECT_ID,
@@ -14,7 +13,6 @@ const serviceAccount = {
   client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
 };
 
-// Initialize the app
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -22,10 +20,8 @@ if (!admin.apps.length) {
   });
 }
 
-// Get Firestore instance
 const db = admin.firestore();
 
-// Get Auth instance
 const auth = admin.auth();
 
 module.exports = { admin, db, auth };

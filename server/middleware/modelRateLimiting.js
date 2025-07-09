@@ -1,29 +1,55 @@
 const { getModelRateLimits } = require("../config/rateLimits");
 
-// In-memory store for tracking model-specific requests (in production, use Redis)
 const modelRequestTracker = new Map();
 const modelTokenTracker = new Map();
 const modelDailyRequestTracker = new Map();
 
-const modelRateLimiting = async (req, res, next) => {
-  const userId = req.user.uid;
-  const { provider, model } = req.body;
+const checkRateLimits = async (
+  userId,
+  provider,
+  model,
+  keyId,
+  estimatedTokens = 0
+) => {
   const now = Date.now();
 
-  if (!provider || !model) {
-    return next(); // Skip if no provider/model specified
+  let modelLimits = getModelRateLimits(provider, model);
+
+  if (keyId) {
+    try {
+      const { db } = require("../config/firebase");
+      const userDoc = await db.collection("users").doc(userId).get();
+      const userData = userDoc.data();
+      const apiKeys = userData.apiKeys || [];
+      const selectedKey = apiKeys.find((key) => key.id === keyId);
+
+      if (selectedKey && selectedKey.rateLimits) {
+        modelLimits = {
+          requestsPerMinute:
+            selectedKey.rateLimits.requestsPerMinute ??
+            modelLimits.requestsPerMinute,
+          requestsPerDay:
+            selectedKey.rateLimits.requestsPerDay ?? modelLimits.requestsPerDay,
+          tokensPerMinute:
+            selectedKey.rateLimits.tokensPerMinute ??
+            modelLimits.tokensPerMinute,
+          maxTokensPerRequest:
+            selectedKey.rateLimits.maxTokensPerRequest ??
+            modelLimits.maxTokensPerRequest,
+        };
+      }
+    } catch (error) {
+      console.error("Error getting custom rate limits:", error);
+    }
   }
 
-  const modelLimits = getModelRateLimits(provider, model);
   const minuteKey = Math.floor(now / 60000);
-  const dayKey = Math.floor(now / (24 * 60 * 60 * 1000)); // Day key
+  const dayKey = Math.floor(now / (24 * 60 * 60 * 1000));
 
-  // Track requests per minute per model
   const requestKey = `${userId}:${provider}:${model}:requests:${minuteKey}`;
   const tokenKey = `${userId}:${provider}:${model}:tokens:${minuteKey}`;
   const dailyRequestKey = `${userId}:${provider}:${model}:daily:${dayKey}`;
 
-  // Initialize trackers if they don't exist
   if (!modelRequestTracker.has(requestKey)) {
     modelRequestTracker.set(requestKey, { count: 0, firstRequest: now });
   }
@@ -41,48 +67,48 @@ const modelRateLimiting = async (req, res, next) => {
   const tokenTracker = modelTokenTracker.get(tokenKey);
   const dailyRequestTracker = modelDailyRequestTracker.get(dailyRequestKey);
 
-  // Check daily request limit
   if (
     modelLimits.requestsPerDay &&
     dailyRequestTracker.count >= modelLimits.requestsPerDay
   ) {
-    return res.status(429).json({
+    return {
+      limited: true,
       error: "Daily Rate Limited",
       message: `Daily rate limit exceeded for ${provider}/${model}. Maximum ${modelLimits.requestsPerDay} requests per day.`,
       retryAfter:
         24 * 60 * 60 -
         Math.floor((now - dailyRequestTracker.firstRequest) / 1000),
-    });
+    };
   }
 
-  // Check request rate limit per minute
-  if (requestTracker.count >= modelLimits.requestsPerMinute) {
-    return res.status(429).json({
+  if (
+    modelLimits.requestsPerMinute &&
+    requestTracker.count >= modelLimits.requestsPerMinute
+  ) {
+    return {
+      limited: true,
       error: "Model Rate Limited",
       message: `Rate limit exceeded for ${provider}/${model}. Maximum ${modelLimits.requestsPerMinute} requests per minute.`,
       retryAfter: 60 - Math.floor((now - requestTracker.firstRequest) / 1000),
-    });
+    };
   }
 
-  // Check token rate limit (estimate based on message length)
-  const estimatedTokens = Math.ceil(req.body.message.length / 4);
-  if (tokenTracker.tokens + estimatedTokens > modelLimits.tokensPerMinute) {
-    return res.status(429).json({
+  if (
+    modelLimits.tokensPerMinute &&
+    tokenTracker.tokens + estimatedTokens > modelLimits.tokensPerMinute
+  ) {
+    return {
+      limited: true,
       error: "Token Rate Limited",
       message: `Token limit exceeded for ${provider}/${model}. Maximum ${modelLimits.tokensPerMinute} tokens per minute.`,
       retryAfter: 60 - Math.floor((now - tokenTracker.firstRequest) / 1000),
-    });
+    };
   }
 
-  // Increment counters
   requestTracker.count++;
   tokenTracker.tokens += estimatedTokens;
   dailyRequestTracker.count++;
 
-  // Store the limits in the request for later use
-  req.modelLimits = modelLimits;
-
-  // Clean up old tracking data (older than 2 minutes for minute-based, 2 days for daily)
   const twoMinutesAgo = Math.floor((now - 120000) / 60000);
   const twoDaysAgo = Math.floor(
     (now - 2 * 24 * 60 * 60 * 1000) / (24 * 60 * 60 * 1000)
@@ -107,7 +133,11 @@ const modelRateLimiting = async (req, res, next) => {
     }
   }
 
+  return { limited: false, modelLimits };
+};
+
+const modelRateLimiting = async (req, res, next) => {
   next();
 };
 
-module.exports = modelRateLimiting;
+module.exports = { modelRateLimiting, checkRateLimits };

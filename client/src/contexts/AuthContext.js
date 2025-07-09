@@ -107,7 +107,6 @@ export function AuthProvider({ children }) {
       setUserData(response.data.user);
       return response.data.user;
     } catch (error) {
-      console.error("Error verifying user:", error);
       return null;
     }
   }, [currentUser]);
@@ -122,9 +121,7 @@ export function AuthProvider({ children }) {
     const handleRedirectResult = async () => {
       try {
         await getRedirectResult(auth);
-      } catch (error) {
-        console.error("Error getting redirect result:", error);
-      }
+      } catch (error) {}
     };
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {

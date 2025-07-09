@@ -16,35 +16,21 @@ function AppContent() {
   const { currentUser, loading } = useAuth();
   const { settings } = useComparisonSettings();
 
-  // Apply theme settings
   useEffect(() => {
-    // Apply theme
     if (settings.theme === "dark") {
       document.documentElement.classList.add("dark");
       document.documentElement.classList.remove("light");
-    } else if (settings.theme === "light") {
+    } else {
       document.documentElement.classList.remove("dark");
       document.documentElement.classList.add("light");
-    } else if (settings.theme === "auto") {
-      // Auto theme based on system preference
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      if (mediaQuery.matches) {
-        document.documentElement.classList.add("dark");
-        document.documentElement.classList.remove("light");
-      } else {
-        document.documentElement.classList.remove("dark");
-        document.documentElement.classList.add("light");
-      }
     }
 
-    // Apply font size
     document.body.className = document.body.className.replace(
       /font-size-\w+/g,
       ""
     );
     document.body.classList.add(`font-size-${settings.fontSize}`);
 
-    // Apply animations
     if (!settings.animations) {
       document.documentElement.style.setProperty("--transition-fast", "0ms");
       document.documentElement.style.setProperty("--transition-normal", "0ms");
@@ -55,7 +41,6 @@ function AppContent() {
       document.documentElement.style.removeProperty("--transition-slow");
     }
 
-    // Apply compact mode
     if (settings.compactMode) {
       document.body.classList.add("compact-mode");
     } else {
@@ -67,25 +52,6 @@ function AppContent() {
     settings.animations,
     settings.compactMode,
   ]);
-
-  // Listen for system theme changes when auto theme is enabled
-  useEffect(() => {
-    if (settings.theme !== "auto") return;
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = (e) => {
-      if (e.matches) {
-        document.documentElement.classList.add("dark");
-        document.documentElement.classList.remove("light");
-      } else {
-        document.documentElement.classList.remove("dark");
-        document.documentElement.classList.add("light");
-      }
-    };
-
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, [settings.theme]);
 
   if (loading) {
     return <LoadingSpinner />;

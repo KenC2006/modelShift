@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useComparisonSettings } from "../contexts/ComparisonSettingsContext";
 import {
-  Bot,
   AlertCircle,
   Clock,
   Zap,
@@ -20,7 +19,6 @@ const ComparisonResult = ({ result }) => {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef(null);
 
-  // Handle clicks outside the dropdown menu
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -60,13 +58,13 @@ const ComparisonResult = ({ result }) => {
   const getProviderColor = (provider) => {
     switch (provider?.toLowerCase()) {
       case "openai":
-        return "bg-green-50 border-green-200";
+        return "bg-theme-surface border-theme-border";
       case "gemini":
-        return "bg-purple-50 border-purple-200";
+        return "bg-theme-surface border-theme-border";
       case "claude":
-        return "bg-orange-50 border-orange-200";
+        return "bg-theme-surface border-theme-border";
       default:
-        return "bg-gray-50 border-gray-200";
+        return "bg-theme-surface border-theme-border";
     }
   };
 
@@ -110,17 +108,16 @@ const ComparisonResult = ({ result }) => {
       return content;
     }
 
-    // Simple markdown rendering
     return content
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
       .replace(
         /`(.*?)`/g,
-        '<code class="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">$1</code>'
+        '<code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm font-mono">$1</code>'
       )
       .replace(
         /```([\s\S]*?)```/g,
-        '<pre class="bg-gray-100 p-4 rounded-lg overflow-x-auto my-2"><code>$1</code></pre>'
+        '<pre class="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg overflow-x-auto my-2"><code>$1</code></pre>'
       )
       .replace(/\n/g, "<br>");
   };
@@ -128,9 +125,9 @@ const ComparisonResult = ({ result }) => {
   const renderContent = () => {
     if (!result.success) {
       return (
-        <div className="text-red-700 bg-red-50 border border-red-200 p-4 rounded-lg">
+        <div className="text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 p-4 rounded-lg">
           <div className="flex items-center space-x-2 mb-2">
-            <AlertCircle className="h-4 w-4" />
+            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
             <span className="font-medium">Error</span>
           </div>
           <p>{result.content}</p>
@@ -156,12 +153,11 @@ const ComparisonResult = ({ result }) => {
 
   return (
     <div
-      className={`bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow ${getProviderColor(
+      className={`border rounded-lg shadow-sm hover:shadow-md transition-shadow ${getProviderColor(
         result.metadata?.provider
       )}`}
     >
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-theme-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-2">
@@ -178,7 +174,7 @@ const ComparisonResult = ({ result }) => {
               <div className="font-medium text-sm">
                 {result.metadata?.keyName || result.metadata?.provider}
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-theme-text-tertiary">
                 {result.metadata?.provider} • {result.metadata?.model}
               </div>
             </div>
@@ -186,7 +182,7 @@ const ComparisonResult = ({ result }) => {
 
           <div className="flex items-center space-x-2">
             {settings.showTimestamps && (
-              <span className="text-xs text-gray-500 flex items-center">
+              <span className="text-xs text-theme-text-tertiary flex items-center">
                 <Clock className="h-3 w-3 mr-1" />
                 {formatTime(result.timestamp)}
               </span>
@@ -195,16 +191,16 @@ const ComparisonResult = ({ result }) => {
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setShowMenu(!showMenu)}
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                className="p-1 hover:bg-theme-hover rounded transition-colors"
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
 
               {showMenu && (
-                <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
+                <div className="absolute right-0 top-8 bg-theme-surface border border-theme-border rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
                   <button
                     onClick={copyToClipboard}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-theme-hover flex items-center"
                   >
                     {copied ? (
                       <Check className="h-4 w-4 mr-2" />
@@ -215,7 +211,7 @@ const ComparisonResult = ({ result }) => {
                   </button>
                   <button
                     onClick={downloadResponse}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-theme-hover flex items-center"
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Download
@@ -227,24 +223,16 @@ const ComparisonResult = ({ result }) => {
         </div>
       </div>
 
-      {/* Content */}
       <div className="p-4">
-        <div className="text-gray-700">{renderContent()}</div>
+        <div className="text-theme-text">{renderContent()}</div>
       </div>
 
-      {/* Footer */}
       {result.success && result.metadata && (
-        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 rounded-b-lg">
-          <div className="flex items-center justify-between text-xs text-gray-500">
+        <div className="px-4 py-3 bg-theme-secondary border-t border-theme-border rounded-b-lg">
+          <div className="flex items-center justify-between text-xs text-theme-text-tertiary">
             {settings.showProviderInfo && result.metadata.provider && (
               <div className="flex items-center space-x-1">
                 <span className="capitalize">{result.metadata.provider}</span>
-              </div>
-            )}
-            {settings.showTokenCount && result.metadata.tokensUsed && (
-              <div className="flex items-center space-x-1">
-                <Zap className="h-3 w-3" />
-                <span>{result.metadata.tokensUsed} tokens</span>
               </div>
             )}
           </div>

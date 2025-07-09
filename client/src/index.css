@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 /* ===== CSS CUSTOM PROPERTIES FOR THEMING ===== */
-:root {
+:root,
+.light {
   /* Light Theme Colors */
   --theme-bg: #ffffff;
   --theme-bg-secondary: #f8fafc;
@@ -56,6 +57,13 @@
   --theme-text-tertiary: #94a3b8;
   --theme-text-muted: #64748b;
   --theme-ring: rgba(96, 165, 250, 0.2);
+
+  /* Dark theme semantic colors */
+  --color-primary: #60a5fa;
+  --color-primary-hover: #3b82f6;
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
 
   /* Dark theme shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
@@ -174,17 +182,6 @@
     color: var(--theme-text);
   }
 
-  .btn-ghost {
-    background-color: transparent;
-    color: var(--theme-text-secondary);
-    border-color: transparent;
-  }
-
-  .btn-ghost:hover:not(:disabled) {
-    background-color: var(--theme-surface-hover);
-    color: var(--theme-text);
-  }
-
   .btn-success {
     background-color: var(--color-success);
     color: white;
@@ -194,17 +191,6 @@
   .btn-success:hover:not(:disabled) {
     background-color: #16a34a;
     border-color: #16a34a;
-  }
-
-  .btn-error {
-    background-color: var(--color-error);
-    color: white;
-    border-color: var(--color-error);
-  }
-
-  .btn-error:hover:not(:disabled) {
-    background-color: #dc2626;
-    border-color: #dc2626;
   }
 
   /* Form Components */
@@ -373,32 +359,6 @@
     box-shadow: var(--shadow-sm);
   }
 
-  /* Chat Messages */
-  .chat-message {
-    padding: 1rem;
-    border-radius: 0.75rem;
-    margin-bottom: 1rem;
-    max-width: 64rem;
-    transition: all var(--transition-normal);
-  }
-
-  .chat-message.user {
-    background-color: var(--color-primary);
-    color: white;
-    margin-left: auto;
-  }
-
-  .chat-message.assistant {
-    background-color: var(--theme-surface);
-    color: var(--theme-text);
-    border: 1px solid var(--theme-border);
-  }
-
-  .chat-message:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
-  }
-
   /* Loading Animation */
   .loading-dots {
     display: inline-flex;
@@ -419,80 +379,6 @@
 
   .loading-dots span:nth-child(3) {
     animation-delay: 0.4s;
-  }
-
-  /* Comparison Cards */
-  .comparison-card {
-    background-color: var(--theme-surface);
-    border: 1px solid var(--theme-border);
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    box-shadow: var(--shadow-sm);
-    transition: all var(--transition-normal);
-  }
-
-  .comparison-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-  }
-
-  .comparison-card.openai {
-    border-left: 4px solid #14b8a6;
-  }
-
-  .comparison-card.gemini {
-    border-left: 4px solid #a855f7;
-  }
-
-  .comparison-card.claude {
-    border-left: 4px solid #f97316;
-  }
-
-  /* Modal */
-  .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 50;
-    backdrop-filter: blur(4px);
-  }
-
-  .modal-content {
-    background-color: var(--theme-surface);
-    border: 1px solid var(--theme-border);
-    border-radius: 0.75rem;
-    box-shadow: var(--shadow-xl);
-    max-width: 90vw;
-    max-height: 90vh;
-    overflow: auto;
-  }
-
-  /* Navigation */
-  .nav-link {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    color: var(--theme-text-secondary);
-    text-decoration: none;
-    border-radius: 0.5rem;
-    transition: all var(--transition-normal);
-  }
-
-  .nav-link:hover {
-    background-color: var(--theme-surface-hover);
-    color: var(--theme-text);
-  }
-
-  .nav-link.active {
-    background-color: var(--color-primary);
-    color: white;
   }
 
   /* Tooltip */
@@ -707,48 +593,5 @@
   .text-size-large {
     font-size: 1.125rem;
     line-height: 1.75rem;
-  }
-
-  /* Compact mode utilities */
-  .compact-mode .chat-message {
-    padding: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .compact-mode .card {
-    padding: 1rem;
-  }
-
-  .compact-mode .space-y-4 > * + * {
-    margin-top: 0.5rem;
-  }
-
-  .compact-mode .space-y-6 > * + * {
-    margin-top: 1rem;
-  }
-
-  /* Comparison grid utilities */
-  .comparison-grid {
-    display: grid;
-    gap: 1rem;
-  }
-
-  .comparison-grid-1 {
-    grid-template-columns: 1fr;
-  }
-  .comparison-grid-2 {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  }
-  .comparison-grid-3 {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  }
-  .comparison-grid-4 {
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  }
-  .comparison-grid-5 {
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  }
-  .comparison-grid-6 {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   }
 }

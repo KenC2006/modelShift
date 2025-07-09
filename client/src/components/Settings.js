@@ -2,7 +2,6 @@ import React from "react";
 import { useComparisonSettings } from "../contexts/ComparisonSettingsContext";
 import { Palette, Eye, RotateCcw, Zap, HelpCircle } from "lucide-react";
 
-// Toggle Switch Component
 const ToggleSwitch = ({
   checked,
   onChange,
@@ -63,8 +62,7 @@ const Settings = () => {
               <div className="tooltip">
                 <HelpCircle className="h-4 w-4 text-theme-text-muted hover:text-theme-text-tertiary cursor-help" />
                 <div className="tooltip-content">
-                  Choose between light, dark, or automatic theme based on system
-                  preference
+                  Choose between light and dark themes
                 </div>
               </div>
             </div>
@@ -75,7 +73,6 @@ const Settings = () => {
             >
               <option value="light">Light</option>
               <option value="dark">Dark</option>
-              <option value="auto">Auto</option>
             </select>
           </div>
 
@@ -206,37 +203,6 @@ const Settings = () => {
               <span>Focused</span>
               <span>Balanced</span>
               <span>Creative</span>
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center space-x-2 mb-3">
-              <label className="block text-sm font-medium text-theme-text-secondary">
-                Max Tokens: {settings.maxTokens}
-              </label>
-              <div className="tooltip">
-                <HelpCircle className="h-4 w-4 text-theme-text-muted hover:text-theme-text-tertiary cursor-help" />
-                <div className="tooltip-content">
-                  Maximum length of AI responses (affects cost and response
-                  length)
-                </div>
-              </div>
-            </div>
-            <input
-              type="range"
-              min="100"
-              max="4000"
-              step="100"
-              value={settings.maxTokens}
-              onChange={(e) =>
-                updateSetting("maxTokens", parseInt(e.target.value))
-              }
-              className="slider"
-            />
-            <div className="flex justify-between text-xs text-theme-text-muted mt-2">
-              <span>100</span>
-              <span>2000</span>
-              <span>4000</span>
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Eye, EyeOff, Key } from "lucide-react";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -27,7 +28,6 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
     },
   ];
 
-  // OpenAI models with descriptions
   const openaiModels = [
     {
       value: "gpt-4o",
@@ -57,7 +57,6 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
     },
   ];
 
-  // Gemini models with descriptions
   const geminiModels = [
     {
       value: "gemini-2.0-flash",
@@ -76,7 +75,6 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
     },
   ];
 
-  // Claude models with descriptions
   const claudeModels = [
     {
       value: "claude-3-5-sonnet-20241022",
@@ -127,7 +125,6 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
       toast.success("API key added successfully");
       onSuccess();
     } catch (error) {
-      console.error("Error adding API key:", error);
       toast.error(error.response?.data?.message || "Failed to add API key");
     } finally {
       setLoading(false);
@@ -163,7 +160,7 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
         <div>
           <label
             htmlFor="model"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-theme-text mb-1"
           >
             Model *
           </label>
@@ -182,7 +179,8 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
             ))}
           </select>
           {formData.model && (
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-theme-text-muted mt-1">
+              Free Rate:{" "}
               {models.find((m) => m.value === formData.model)?.description}
             </p>
           )}
@@ -194,7 +192,7 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
       <div>
         <label
           htmlFor="model"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-theme-text mb-1"
         >
           Model
         </label>
@@ -209,21 +207,21 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
           placeholder="Enter model name"
           maxLength={50}
         />
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-theme-text-muted mt-1">
           Leave empty to use the default model for the selected provider
         </p>
       </div>
     );
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Add API Key</h2>
+  return createPortal(
+    <div className="fixed top-0 left-0 w-screen h-screen bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+      <div className="bg-theme-surface rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b border-theme-border">
+          <h2 className="text-lg font-semibold text-theme-text">Add API Key</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-theme-text-muted hover:text-theme-text-secondary transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -234,7 +232,7 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
           <div>
             <label
               htmlFor="name"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block text-sm font-medium text-theme-text mb-1"
             >
               Key Name *
             </label>
@@ -255,7 +253,7 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
           <div>
             <label
               htmlFor="provider"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block text-sm font-medium text-theme-text mb-1"
             >
               Provider *
             </label>
@@ -280,13 +278,13 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
           <div>
             <label
               htmlFor="key"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block text-sm font-medium text-theme-text mb-1"
             >
               API Key *
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Key className="h-5 w-5 text-gray-400" />
+                <Key className="h-5 w-5 text-theme-text-muted" />
               </div>
               <input
                 type={showKey ? "text" : "password"}
@@ -304,13 +302,13 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
                 className="absolute inset-y-0 right-0 pr-3 flex items-center"
               >
                 {showKey ? (
-                  <EyeOff className="h-5 w-5 text-gray-400" />
+                  <EyeOff className="h-5 w-5 text-theme-text-muted" />
                 ) : (
-                  <Eye className="h-5 w-5 text-gray-400" />
+                  <Eye className="h-5 w-5 text-theme-text-muted" />
                 )}
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-theme-text-muted mt-1">
               Your API key is encrypted and stored securely
             </p>
           </div>
@@ -320,7 +318,7 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg font-medium transition-colors duration-200"
+              className="flex-1 btn btn-secondary"
             >
               Cancel
             </button>
@@ -332,22 +330,22 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
                 !formData.key.trim() ||
                 !formData.model.trim()
               }
-              className="flex-1 px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed border border-blue-600 hover:border-blue-700 rounded-lg font-medium transition-colors duration-200"
+              className="flex-1 btn btn-primary inline-flex items-center justify-center"
             >
               {loading ? (
-                <div className="loading-dots">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
               ) : (
-                "Add Key"
+                <>
+                  <Key className="h-4 w-4 mr-2" />
+                  Add Key
+                </>
               )}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

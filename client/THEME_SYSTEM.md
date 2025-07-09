@@ -2,7 +2,7 @@
 
 ## Overview
 
-The application now uses a modern, comprehensive theme system built with CSS Custom Properties (CSS Variables) and Tailwind CSS. This system provides consistent theming across all components with support for light, dark, and automatic themes.
+The application now uses a modern, comprehensive theme system built with CSS Custom Properties (CSS Variables) and Tailwind CSS. This system provides consistent theming across all components with support for light and dark themes.
 
 ## Architecture
 
@@ -172,46 +172,15 @@ useEffect(() => {
   if (settings.theme === "dark") {
     document.documentElement.classList.add("dark");
     document.documentElement.classList.remove("light");
-  } else if (settings.theme === "light") {
+  } else {
+    // Default to light theme
     document.documentElement.classList.remove("dark");
     document.documentElement.classList.add("light");
-  } else if (settings.theme === "auto") {
-    // Auto theme based on system preference
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    if (mediaQuery.matches) {
-      document.documentElement.classList.add("dark");
-      document.documentElement.classList.remove("light");
-    } else {
-      document.documentElement.classList.remove("dark");
-      document.documentElement.classList.add("light");
-    }
   }
 }, [settings.theme]);
 ```
 
-### System Theme Detection
-
-The system automatically detects and responds to system theme changes:
-
-```javascript
-useEffect(() => {
-  if (settings.theme !== "auto") return;
-
-  const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-  const handleChange = (e) => {
-    if (e.matches) {
-      document.documentElement.classList.add("dark");
-      document.documentElement.classList.remove("light");
-    } else {
-      document.documentElement.classList.remove("dark");
-      document.documentElement.classList.add("light");
-    }
-  };
-
-  mediaQuery.addEventListener("change", handleChange);
-  return () => mediaQuery.removeEventListener("change", handleChange);
-}, [settings.theme]);
-```
+````
 
 ## Component Guidelines
 
@@ -229,7 +198,7 @@ Always use theme-aware classes instead of hardcoded colors:
 <div className="bg-white text-black border-gray-200">
   Content
 </div>
-```
+````
 
 ### Component Styling
 

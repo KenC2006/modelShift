@@ -8,50 +8,40 @@ export function useComparisonSettings() {
 
 export function ComparisonSettingsProvider({ children }) {
   const [settings, setSettings] = useState({
-    // Theme settings
-    theme: "light", // light, dark, auto
+    theme: "light",
 
-    // Comparison appearance
-    fontSize: "medium", // small, medium, large
+    fontSize: "medium",
     compactMode: false,
     showTimestamps: true,
     showProviderInfo: true,
     showTokenCount: true,
     showMessageActions: true,
 
-    // AI behavior
     systemPrompt:
       "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.",
     temperature: 0.7,
-    maxTokens: 1000,
 
-    // UI preferences
     showWelcomeMessage: true,
     animations: true,
     autoScroll: true,
     markdownRendering: true,
 
-    // Comparison specific settings
     defaultMaxComparisons: 3,
     showResponseTime: true,
     highlightDifferences: false,
     autoExpandResponses: false,
   });
 
-  // Load settings from localStorage
   useEffect(() => {
     const savedSettings = localStorage.getItem("comparisonSettings");
     if (savedSettings) {
       try {
         const parsed = JSON.parse(savedSettings);
         setSettings((prev) => ({ ...prev, ...parsed }));
-      } catch (error) {
-        console.error("Error loading comparison settings:", error);
-      }
+      } catch (error) {}
     }
   }, []);
 
-  // Save settings to localStorage
   useEffect(() => {
     localStorage.setItem("comparisonSettings", JSON.stringify(settings));
   }, [settings]);
@@ -76,7 +66,6 @@ export function ComparisonSettingsProvider({ children }) {
       systemPrompt:
         "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.",
       temperature: 0.7,
-      maxTokens: 1000,
       showWelcomeMessage: true,
       animations: true,
       autoScroll: true,

@@ -16,7 +16,6 @@ const authRoutes = require("./routes/auth");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Security middleware
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -41,7 +40,6 @@ app.use(
   })
 );
 
-// Rate limiting
 const generalLimits = getGeneralRateLimits();
 const limiter = rateLimit({
   windowMs: generalLimits.WINDOW_MS,
@@ -52,7 +50,6 @@ const limiter = rateLimit({
 });
 app.use("/api/", limiter);
 
-// CORS configuration
 app.use(
   cors({
     origin:
@@ -65,16 +62,13 @@ app.use(
   })
 );
 
-// Other middleware
 app.use(compression());
 app.use(morgan("combined"));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Input sanitization middleware
 app.use((req, res, next) => {
   if (req.body && req.body.message) {
-    // Basic sanitization - remove potentially dangerous content
     req.body.message = req.body.message
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
       .replace(/javascript:/gi, "")
@@ -84,11 +78,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api", apiRoutes);
 
-// Health check endpoint
 app.get("/health", (req, res) => {
   res.status(200).json({
     status: "OK",
@@ -97,7 +89,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Error:", err);
 
@@ -124,7 +115,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
 app.use("*", (req, res) => {
   res.status(404).json({
     error: "Not Found",
@@ -132,10 +122,6 @@ app.use("*", (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🔒 Security: Helmet, CORS, Rate Limiting enabled`);
-});
+app.listen(PORT, () => {});
 
 module.exports = app;

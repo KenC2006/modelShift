@@ -51,7 +51,7 @@ const KeySelector = ({ keys, selectedKeyId, onKeySelect }) => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+        <div className="absolute right-0 mt-2 w-64 bg-theme-surface rounded-lg shadow-lg border border-theme-border py-1 z-50">
           <div className="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">
             Active API Keys
           </div>

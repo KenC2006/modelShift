@@ -12,8 +12,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import KeyManager from "./KeyManager";
-import Settings from "./Settings";
 
 const Layout = ({ children }) => {
   const { userData, logout } = useAuth();
@@ -26,7 +24,6 @@ const Layout = ({ children }) => {
       await logout();
       toast.success("Successfully logged out");
     } catch (error) {
-      console.error("Logout error:", error);
       toast.error("Failed to log out");
     }
   };

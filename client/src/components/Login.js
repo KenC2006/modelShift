@@ -10,7 +10,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const { signInWithEmail, signUpWithEmail } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -19,15 +19,14 @@ const Login = () => {
 
     try {
       if (isSignUp) {
-        await signUp(email, password);
+        await signUpWithEmail(email, password);
         toast.success("Account created successfully!");
       } else {
-        await signIn(email, password);
+        await signInWithEmail(email, password);
         toast.success("Signed in successfully!");
       }
       navigate("/");
     } catch (error) {
-      console.error("Auth error:", error);
       toast.error(error.message || "Authentication failed");
     } finally {
       setIsLoading(false);

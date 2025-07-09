@@ -9,15 +9,19 @@ import {
   Zap,
   Clock,
   AlertCircle,
-  Info,
+  Edit,
 } from "lucide-react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import AddKeyModal from "./AddKeyModal";
+import EditKeyModal from "./EditKeyModal";
+import { getDefaultRateLimit } from "../utils/defaultRateLimits";
 
 const KeyManager = () => {
   const { userData, refreshUserData } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingKey, setEditingKey] = useState(null);
   const [usageStats, setUsageStats] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -29,9 +33,7 @@ const KeyManager = () => {
     try {
       const response = await axios.get("/api/chat/usage");
       setUsageStats(response.data);
-    } catch (error) {
-      console.error("Error fetching usage stats:", error);
-    }
+    } catch (error) {}
   };
 
   const handleDeleteKey = async (keyId) => {
@@ -50,7 +52,6 @@ const KeyManager = () => {
       await fetchUsageStats();
       toast.success("API key deleted successfully");
     } catch (error) {
-      console.error("Error deleting API key:", error);
       toast.error(error.response?.data?.message || "Failed to delete API key");
     } finally {
       setLoading(false);
@@ -67,7 +68,6 @@ const KeyManager = () => {
         `API key ${!isActive ? "activated" : "deactivated"} successfully`
       );
     } catch (error) {
-      console.error("Error toggling API key:", error);
       toast.error(error.response?.data?.message || "Failed to update API key");
     } finally {
       setLoading(false);
@@ -103,20 +103,15 @@ const KeyManager = () => {
   const formatDate = (dateInput) => {
     if (!dateInput) return "Unknown";
 
-    // Handle Firestore Timestamp objects
     let date;
     if (dateInput.toDate) {
-      // Firestore Timestamp
       date = dateInput.toDate();
     } else if (dateInput.seconds) {
-      // Firestore Timestamp as object
       date = new Date(dateInput.seconds * 1000);
     } else {
-      // Regular date string or Date object
       date = new Date(dateInput);
     }
 
-    // Check if date is valid
     if (isNaN(date.getTime())) {
       return "Invalid date";
     }
@@ -131,20 +126,15 @@ const KeyManager = () => {
   const formatLastUsed = (dateInput) => {
     if (!dateInput) return "Never";
 
-    // Handle Firestore Timestamp objects
     let date;
     if (dateInput.toDate) {
-      // Firestore Timestamp
       date = dateInput.toDate();
     } else if (dateInput.seconds) {
-      // Firestore Timestamp as object
       date = new Date(dateInput.seconds * 1000);
     } else {
-      // Regular date string or Date object
       date = new Date(dateInput);
     }
 
-    // Check if date is valid
     if (isNaN(date.getTime())) {
       return "Invalid date";
     }
@@ -167,23 +157,89 @@ const KeyManager = () => {
     });
   };
 
-  const formatRateLimits = (rateLimits) => {
-    if (!rateLimits) return "Unknown";
+  const formatRateLimits = (rateLimits, provider, model) => {
+    if (!rateLimits) return "Default limits";
 
     const limits = [];
-    if (rateLimits.requestsPerMinute) {
+
+    if (rateLimits.requestsPerMinute === null) {
+      limits.push("∞/min");
+    } else if (
+      rateLimits.requestsPerMinute === "" ||
+      rateLimits.requestsPerMinute === undefined
+    ) {
+      const defaultRpm = getDefaultRateLimit(
+        provider,
+        model,
+        "requestsPerMinute"
+      );
+      if (defaultRpm && !isNaN(defaultRpm)) {
+        limits.push(`${defaultRpm}/min`);
+      } else {
+        limits.push("∞/min");
+      }
+    } else {
       limits.push(`${rateLimits.requestsPerMinute}/min`);
     }
-    if (rateLimits.requestsPerDay) {
+
+    if (rateLimits.requestsPerDay === null) {
+      limits.push("∞/day");
+    } else if (
+      rateLimits.requestsPerDay === "" ||
+      rateLimits.requestsPerDay === undefined
+    ) {
+      const defaultRpd = getDefaultRateLimit(provider, model, "requestsPerDay");
+      if (defaultRpd && !isNaN(defaultRpd)) {
+        limits.push(`${defaultRpd}/day`);
+      } else {
+        limits.push("∞/day");
+      }
+    } else {
       limits.push(`${rateLimits.requestsPerDay}/day`);
     }
-    if (rateLimits.tokensPerMinute) {
+
+    if (rateLimits.tokensPerMinute === null) {
+      limits.push("∞ tokens/min");
+    } else if (
+      rateLimits.tokensPerMinute === "" ||
+      rateLimits.tokensPerMinute === undefined
+    ) {
+      const defaultTpm = getDefaultRateLimit(
+        provider,
+        model,
+        "tokensPerMinute"
+      );
+      if (defaultTpm && !isNaN(defaultTpm)) {
+        limits.push(`${(defaultTpm / 1000).toFixed(0)}k tokens/min`);
+      } else {
+        limits.push("∞ tokens/min");
+      }
+    } else {
       limits.push(
         `${(rateLimits.tokensPerMinute / 1000).toFixed(0)}k tokens/min`
       );
     }
-    if (rateLimits.maxTokensPerRequest) {
-      limits.push(`${(rateLimits.maxTokensPerRequest / 1000).toFixed(0)}k max`);
+
+    if (rateLimits.maxTokensPerRequest === null) {
+      limits.push("∞ tokens/req");
+    } else if (
+      rateLimits.maxTokensPerRequest === "" ||
+      rateLimits.maxTokensPerRequest === undefined
+    ) {
+      const defaultMtpr = getDefaultRateLimit(
+        provider,
+        model,
+        "maxTokensPerRequest"
+      );
+      if (defaultMtpr && !isNaN(defaultMtpr)) {
+        limits.push(`${(defaultMtpr / 1000).toFixed(0)}k tokens/req`);
+      } else {
+        limits.push("∞ tokens/req");
+      }
+    } else {
+      limits.push(
+        `${(rateLimits.maxTokensPerRequest / 1000).toFixed(0)}k tokens/req`
+      );
     }
 
     return limits.join(" • ");
@@ -230,16 +286,6 @@ const KeyManager = () => {
             </div>
 
             <div className="text-center">
-              <div className="w-12 h-12 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Clock className="h-6 w-6 text-success-600" />
-              </div>
-              <h3 className="text-2xl font-bold text-theme-text mb-1">
-                {usageStats.totalTokens || 0}
-              </h3>
-              <p className="text-theme-text-secondary text-sm">Total Tokens</p>
-            </div>
-
-            <div className="text-center">
               <div className="w-12 h-12 bg-error-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <AlertCircle className="h-6 w-6 text-error-600" />
               </div>
@@ -277,9 +323,6 @@ const KeyManager = () => {
                           <div>
                             <p className="text-sm font-medium text-theme-text">
                               {activity.model}
-                            </p>
-                            <p className="text-xs text-theme-text-muted">
-                              {activity.tokens} tokens
                             </p>
                           </div>
                         </div>
@@ -328,13 +371,30 @@ const KeyManager = () => {
                       <p className="text-sm text-theme-text-secondary">
                         {key.provider} • {key.model}
                       </p>
-                      <p className="text-xs text-theme-text-muted">
-                        Added {formatDate(key.createdAt)}
-                      </p>
+                      {key.rateLimits && (
+                        <p className="text-xs text-theme-text-tertiary mt-1">
+                          {formatRateLimits(
+                            key.rateLimits,
+                            key.provider,
+                            key.model
+                          )}
+                        </p>
+                      )}
                     </div>
                   </div>
 
                   <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => {
+                        setEditingKey(key);
+                        setShowEditModal(true);
+                      }}
+                      disabled={loading}
+                      className="p-2 text-theme-text-tertiary hover:text-theme-text hover:bg-theme-surface-hover rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
                     <button
                       onClick={() => handleToggleKey(key.id, key.isActive)}
                       disabled={loading}
@@ -385,6 +445,22 @@ const KeyManager = () => {
             await refreshUserData();
             await fetchUsageStats();
             setShowAddModal(false);
+          }}
+        />
+      )}
+
+      {showEditModal && editingKey && (
+        <EditKeyModal
+          keyData={editingKey}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingKey(null);
+          }}
+          onSuccess={async () => {
+            await refreshUserData();
+            await fetchUsageStats();
+            setShowEditModal(false);
+            setEditingKey(null);
           }}
         />
       )}

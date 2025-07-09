@@ -6,13 +6,11 @@ const authenticateToken = require("../middleware/auth");
 
 const router = express.Router();
 
-// Verify user token and get user info
 router.get("/verify", authenticateToken, async (req, res) => {
   try {
     const userDoc = await db.collection("users").doc(req.user.uid).get();
 
     if (!userDoc.exists) {
-      // Create new user document
       await db
         .collection("users")
         .doc(req.user.uid)
@@ -41,7 +39,6 @@ router.get("/verify", authenticateToken, async (req, res) => {
       });
     }
 
-    // Update last login
     await db.collection("users").doc(req.user.uid).update({
       lastLogin: new Date(),
     });
@@ -71,7 +68,6 @@ router.get("/verify", authenticateToken, async (req, res) => {
   }
 });
 
-// Add API key
 router.post(
   "/api-keys",
   [
@@ -105,7 +101,6 @@ router.post(
 
       const { name, key, provider, model } = req.body;
 
-      // Encrypt the API key
       let encryptedKey;
       try {
         encryptedKey = encrypt(key);
@@ -117,7 +112,6 @@ router.post(
         });
       }
 
-      // Check if key with same name already exists
       const userDoc = await db.collection("users").doc(req.user.uid).get();
       const userData = userDoc.data();
       const existingKeys = userData.apiKeys || [];
@@ -129,7 +123,6 @@ router.post(
         });
       }
 
-      // Add new API key
       const newKey = {
         id: Date.now().toString(),
         name,
@@ -173,19 +166,37 @@ router.post(
   }
 );
 
-// Get API keys
 router.get("/api-keys", authenticateToken, async (req, res) => {
   try {
     const userDoc = await db.collection("users").doc(req.user.uid).get();
     const userData = userDoc.data();
     const apiKeys = userData.apiKeys || [];
 
-    // Import rate limits function
     const { getModelRateLimits } = require("../config/rateLimits");
 
-    // Return keys without encrypted data, including rate limits
     const safeKeys = apiKeys.map((key) => {
-      const rateLimits = getModelRateLimits(key.provider, key.model);
+      const defaultRateLimits = getModelRateLimits(key.provider, key.model);
+      const customRateLimits = key.rateLimits || {};
+
+      const rateLimits = {
+        requestsPerMinute:
+          customRateLimits.requestsPerMinute !== undefined
+            ? customRateLimits.requestsPerMinute
+            : "",
+        requestsPerDay:
+          customRateLimits.requestsPerDay !== undefined
+            ? customRateLimits.requestsPerDay
+            : "",
+        tokensPerMinute:
+          customRateLimits.tokensPerMinute !== undefined
+            ? customRateLimits.tokensPerMinute
+            : "",
+        maxTokensPerRequest:
+          customRateLimits.maxTokensPerRequest !== undefined
+            ? customRateLimits.maxTokensPerRequest
+            : "",
+      };
+
       return {
         id: key.id,
         name: key.name,
@@ -209,7 +220,6 @@ router.get("/api-keys", authenticateToken, async (req, res) => {
   }
 });
 
-// Update API key
 router.put(
   "/api-keys/:keyId",
   [
@@ -228,6 +238,42 @@ router.put(
       .trim()
       .isLength({ min: 1, max: 50 })
       .withMessage("Model name must be between 1 and 50 characters"),
+    body("rateLimits")
+      .optional()
+      .isObject()
+      .withMessage("Rate limits must be an object"),
+    body("rateLimits.requestsPerMinute")
+      .optional()
+      .custom((value) => {
+        if (value === undefined || value === null || value === "") return true;
+        const num = parseInt(value);
+        return !isNaN(num) && num >= 1;
+      })
+      .withMessage("Requests per minute must be a positive integer"),
+    body("rateLimits.requestsPerDay")
+      .optional()
+      .custom((value) => {
+        if (value === undefined || value === null || value === "") return true;
+        const num = parseInt(value);
+        return !isNaN(num) && num >= 1;
+      })
+      .withMessage("Requests per day must be a positive integer"),
+    body("rateLimits.tokensPerMinute")
+      .optional()
+      .custom((value) => {
+        if (value === undefined || value === null || value === "") return true;
+        const num = parseInt(value);
+        return !isNaN(num) && num >= 1;
+      })
+      .withMessage("Tokens per minute must be a positive integer"),
+    body("rateLimits.maxTokensPerRequest")
+      .optional()
+      .custom((value) => {
+        if (value === undefined || value === null || value === "") return true;
+        const num = parseInt(value);
+        return !isNaN(num) && num >= 1;
+      })
+      .withMessage("Max tokens per request must be a positive integer"),
   ],
   async (req, res) => {
     try {
@@ -240,7 +286,7 @@ router.put(
       }
 
       const { keyId } = req.params;
-      const { name, isActive, model } = req.body;
+      const { name, isActive, model, rateLimits } = req.body;
 
       const userDoc = await db.collection("users").doc(req.user.uid).get();
       const userData = userDoc.data();
@@ -254,9 +300,7 @@ router.put(
         });
       }
 
-      // Update key properties
       if (name !== undefined) {
-        // Check for duplicate names
         if (
           apiKeys.some((key, index) => index !== keyIndex && key.name === name)
         ) {
@@ -276,6 +320,26 @@ router.put(
         apiKeys[keyIndex].model = model;
       }
 
+      if (rateLimits !== undefined) {
+        const currentRateLimits = apiKeys[keyIndex].rateLimits || {};
+        const newRateLimits = { ...currentRateLimits };
+
+        if (rateLimits.requestsPerMinute !== undefined) {
+          newRateLimits.requestsPerMinute = rateLimits.requestsPerMinute;
+        }
+        if (rateLimits.requestsPerDay !== undefined) {
+          newRateLimits.requestsPerDay = rateLimits.requestsPerDay;
+        }
+        if (rateLimits.tokensPerMinute !== undefined) {
+          newRateLimits.tokensPerMinute = rateLimits.tokensPerMinute;
+        }
+        if (rateLimits.maxTokensPerRequest !== undefined) {
+          newRateLimits.maxTokensPerRequest = rateLimits.maxTokensPerRequest;
+        }
+
+        apiKeys[keyIndex].rateLimits = newRateLimits;
+      }
+
       await db.collection("users").doc(req.user.uid).update({
         apiKeys,
       });
@@ -291,10 +355,12 @@ router.put(
           createdAt: apiKeys[keyIndex].createdAt,
           lastUsed: apiKeys[keyIndex].lastUsed,
           usageStats: apiKeys[keyIndex].usageStats,
+          rateLimits: apiKeys[keyIndex].rateLimits,
         },
       });
     } catch (error) {
       console.error("Error updating API key:", error);
+      console.error("Error details:", error.message);
       res.status(500).json({
         error: "Internal Server Error",
         message: "Failed to update API key",
@@ -303,7 +369,6 @@ router.put(
   }
 );
 
-// Delete API key
 router.delete("/api-keys/:keyId", authenticateToken, async (req, res) => {
   try {
     const { keyId } = req.params;

@@ -1,10 +1,10 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ["./src/**/*.{js,jsx,ts,tsx}"],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        // Primary brand colors
         primary: {
           50: "#eff6ff",
           100: "#dbeafe",
@@ -17,7 +17,6 @@ module.exports = {
           800: "#1e40af",
           900: "#1e3a8a",
         },
-        // Neutral grays
         gray: {
           50: "#f9fafb",
           100: "#f3f4f6",
@@ -30,7 +29,6 @@ module.exports = {
           800: "#1f2937",
           900: "#111827",
         },
-        // Semantic colors
         success: {
           50: "#f0fdf4",
           100: "#dcfce7",
@@ -67,7 +65,6 @@ module.exports = {
           800: "#991b1b",
           900: "#7f1d1d",
         },
-        // AI Provider colors
         openai: {
           50: "#f0fdfa",
           100: "#ccfbf1",
@@ -124,30 +121,6 @@ module.exports = {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-5px)" },
         },
-      },
-      // CSS Custom Properties for theming
-      backgroundColor: {
-        "theme-bg": "var(--theme-bg)",
-        "theme-bg-secondary": "var(--theme-bg-secondary)",
-        "theme-bg-tertiary": "var(--theme-bg-tertiary)",
-        "theme-surface": "var(--theme-surface)",
-        "theme-surface-hover": "var(--theme-surface-hover)",
-        "theme-border": "var(--theme-border)",
-        "theme-border-light": "var(--theme-border-light)",
-      },
-      textColor: {
-        "theme-text": "var(--theme-text)",
-        "theme-text-secondary": "var(--theme-text-secondary)",
-        "theme-text-tertiary": "var(--theme-text-tertiary)",
-        "theme-text-muted": "var(--theme-text-muted)",
-      },
-      borderColor: {
-        "theme-border": "var(--theme-border)",
-        "theme-border-light": "var(--theme-border-light)",
-        "theme-border-focus": "var(--theme-border-focus)",
-      },
-      ringColor: {
-        "theme-ring": "var(--theme-ring)",
       },
     },
   },

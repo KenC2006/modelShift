@@ -1,11 +1,3 @@
-const GENERAL_RATE_LIMITS = {
-  WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-  MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-
-  MAX_REQUESTS_PER_MINUTE: parseInt(process.env.MAX_REQUESTS_PER_MINUTE) || 60,
-  BLOCK_DURATION_MINUTES: parseInt(process.env.BLOCK_DURATION_MINUTES) || 30,
-};
-
 const MODEL_RATE_LIMITS = {
   openai: {
     "gpt-4o": {
@@ -108,7 +100,7 @@ const DEFAULT_RATE_LIMITS = {
   maxTokensPerRequest: 4000,
 };
 
-function getModelRateLimits(provider, model) {
+export function getModelRateLimits(provider, model) {
   const providerLimits = MODEL_RATE_LIMITS[provider];
   if (!providerLimits) {
     return DEFAULT_RATE_LIMITS;
@@ -123,14 +115,9 @@ function getModelRateLimits(provider, model) {
   return modelLimits;
 }
 
-function getGeneralRateLimits() {
-  return GENERAL_RATE_LIMITS;
+export function getDefaultRateLimit(provider, model, field) {
+  const modelLimits = getModelRateLimits(provider, model);
+  return modelLimits[field] || null;
 }
 
-module.exports = {
-  GENERAL_RATE_LIMITS,
-  MODEL_RATE_LIMITS,
-  DEFAULT_RATE_LIMITS,
-  getModelRateLimits,
-  getGeneralRateLimits,
-};
+export { MODEL_RATE_LIMITS, DEFAULT_RATE_LIMITS };

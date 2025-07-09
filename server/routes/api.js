@@ -4,18 +4,16 @@ const { db } = require("../config/firebase");
 const { decrypt } = require("../utils/encryption");
 const { getModelRateLimits } = require("../config/rateLimits");
 const authenticateToken = require("../middleware/auth");
-const modelRateLimiting = require("../middleware/modelRateLimiting");
+const { checkRateLimits } = require("../middleware/modelRateLimiting");
 const OpenAI = require("openai");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const router = express.Router();
 
-// Chat with AI
 router.post(
   "/chat",
   [
     authenticateToken,
-    modelRateLimiting,
     body("message")
       .trim()
       .isLength({ min: 1, max: 10000 })
@@ -29,10 +27,6 @@ router.post(
       .optional()
       .isFloat({ min: 0, max: 2 })
       .withMessage("Temperature must be between 0 and 2"),
-    body("maxTokens")
-      .optional()
-      .isInt({ min: 100, max: 4000 })
-      .withMessage("Max tokens must be between 100 and 4000"),
   ],
   async (req, res) => {
     try {
@@ -44,10 +38,9 @@ router.post(
         });
       }
 
-      const { message, keyId, systemPrompt, temperature, maxTokens } = req.body;
+      const { message, keyId, systemPrompt, temperature } = req.body;
       const userId = req.user.uid;
 
-      // Get user's API keys
       const userDoc = await db.collection("users").doc(userId).get();
       const userData = userDoc.data();
       const apiKeys = userData.apiKeys || [];
@@ -59,7 +52,6 @@ router.post(
         });
       }
 
-      // Filter active keys
       const activeKeys = apiKeys.filter((key) => key.isActive);
       if (activeKeys.length === 0) {
         return res.status(400).json({
@@ -68,7 +60,6 @@ router.post(
         });
       }
 
-      // Select API key to use
       let selectedKey = null;
       if (keyId) {
         selectedKey = activeKeys.find((key) => key.id === keyId);
@@ -79,11 +70,26 @@ router.post(
           });
         }
       } else {
-        // Auto-select the best available key
         selectedKey = selectBestKey(activeKeys);
       }
 
-      // Decrypt the API key
+      const estimatedTokens = Math.ceil(message.length / 4);
+      const rateLimitResult = await checkRateLimits(
+        userId,
+        selectedKey.provider,
+        selectedKey.model,
+        keyId,
+        estimatedTokens
+      );
+
+      if (rateLimitResult.limited) {
+        return res.status(429).json({
+          error: rateLimitResult.error,
+          message: rateLimitResult.message,
+          retryAfter: rateLimitResult.retryAfter,
+        });
+      }
+
       let decryptedKey;
       try {
         decryptedKey = decrypt(selectedKey.encryptedKey);
@@ -95,12 +101,8 @@ router.post(
         });
       }
 
-      // Use model limits from middleware or get them if not available
-      const modelLimits =
-        req.modelLimits ||
-        getModelRateLimits(selectedKey.provider, selectedKey.model);
+      const modelLimits = rateLimitResult.modelLimits;
 
-      // Make API call to the selected provider
       let response;
       let tokensUsed = 0;
       let error = null;
@@ -117,7 +119,6 @@ router.post(
               systemPrompt ||
               "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.",
             temperature: temperature || 0.7,
-            maxTokens: maxTokens || 1000,
           }
         );
         response = result.response;
@@ -125,7 +126,6 @@ router.post(
       } catch (apiError) {
         error = apiError;
 
-        // If this key failed, try another key if available
         if (activeKeys.length > 1) {
           const otherKeys = activeKeys.filter(
             (key) => key.id !== selectedKey.id
@@ -143,27 +143,34 @@ router.post(
 
             if (fallbackDecryptedKey) {
               try {
-                const fallbackModelLimits = getModelRateLimits(
+                const fallbackRateLimitResult = await checkRateLimits(
+                  userId,
                   fallbackKey.provider,
-                  fallbackKey.model
+                  fallbackKey.model,
+                  fallbackKey.id,
+                  estimatedTokens
                 );
+
+                if (fallbackRateLimitResult.limited) {
+                  throw new Error(fallbackRateLimitResult.message);
+                }
+
                 const fallbackResult = await callAIProvider(
                   fallbackKey.provider,
                   fallbackDecryptedKey,
                   fallbackKey.model,
                   message,
-                  fallbackModelLimits,
+                  fallbackRateLimitResult.modelLimits,
                   {
                     systemPrompt:
                       systemPrompt ||
                       "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.",
                     temperature: temperature || 0.7,
-                    maxTokens: maxTokens || 1000,
                   }
                 );
                 response = fallbackResult.response;
                 tokensUsed = fallbackResult.tokens || 0;
-                selectedKey = fallbackKey; // Update selected key for stats
+                selectedKey = fallbackKey;
                 error = null;
               } catch (fallbackError) {
                 error = fallbackError;
@@ -173,7 +180,6 @@ router.post(
         }
       }
 
-      // Update usage statistics
       await updateUsageStats(userId, selectedKey.id, tokensUsed, error ? 1 : 0);
 
       if (error) {
@@ -201,7 +207,6 @@ router.post(
   }
 );
 
-// Get usage statistics
 router.get("/usage", async (req, res) => {
   try {
     const userId = req.user.uid;
@@ -237,11 +242,8 @@ router.get("/usage", async (req, res) => {
   }
 });
 
-// Helper function to select the best available key
 function selectBestKey(activeKeys) {
-  // Sort by: active keys first, then by last used (oldest first), then by error rate
   return activeKeys.sort((a, b) => {
-    // Prefer keys with fewer errors
     const aErrorRate = a.usageStats.errors / Math.max(a.usageStats.requests, 1);
     const bErrorRate = b.usageStats.errors / Math.max(b.usageStats.requests, 1);
 
@@ -249,7 +251,6 @@ function selectBestKey(activeKeys) {
       return aErrorRate - bErrorRate;
     }
 
-    // Then prefer keys that haven't been used recently
     const aLastUsed = a.lastUsed
       ? a.lastUsed.toDate
         ? a.lastUsed.toDate().getTime()
@@ -265,7 +266,6 @@ function selectBestKey(activeKeys) {
   })[0];
 }
 
-// Helper function to call AI providers
 async function callAIProvider(
   provider,
   apiKey,
@@ -321,10 +321,7 @@ async function callOpenAI(apiKey, model, message, modelLimits, customSettings) {
         content: message,
       },
     ],
-    max_tokens: Math.min(
-      customSettings.maxTokens,
-      modelLimits.maxTokensPerRequest
-    ),
+
     temperature: customSettings.temperature,
   });
 
@@ -340,10 +337,6 @@ async function callGemini(apiKey, model, message, modelLimits, customSettings) {
     model: model || "gemini-2.0-flash",
     generationConfig: {
       temperature: customSettings?.temperature || 0.7,
-      maxOutputTokens: Math.min(
-        customSettings?.maxTokens || 1000,
-        modelLimits.maxTokensPerRequest
-      ),
     },
   });
 
@@ -358,19 +351,15 @@ async function callGemini(apiKey, model, message, modelLimits, customSettings) {
 }
 
 async function callClaude(apiKey, model, message, modelLimits, customSettings) {
-  // Note: Claude API requires different implementation
-  // This is a placeholder - you'll need to implement Claude API calls
   throw new Error("Claude API not yet implemented");
 }
 
-// Helper function to update usage statistics
 async function updateUsageStats(userId, keyId, tokensUsed, errors = 0) {
   try {
     const userRef = db.collection("users").doc(userId);
     const userDoc = await userRef.get();
     const userData = userDoc.data();
 
-    // Update user's overall usage stats
     const userStats = userData.usageStats || {
       totalRequests: 0,
       totalTokens: 0,
@@ -381,7 +370,6 @@ async function updateUsageStats(userId, keyId, tokensUsed, errors = 0) {
     userStats.totalTokens += tokensUsed;
     userStats.lastRequest = new Date();
 
-    // Update specific key's usage stats
     const apiKeys = userData.apiKeys || [];
     const keyIndex = apiKeys.findIndex((key) => key.id === keyId);
 
@@ -399,7 +387,6 @@ async function updateUsageStats(userId, keyId, tokensUsed, errors = 0) {
       apiKeys[keyIndex].lastUsed = new Date();
     }
 
-    // Update both user stats and key stats in one transaction
     await userRef.update({
       usageStats: userStats,
       apiKeys: apiKeys,
