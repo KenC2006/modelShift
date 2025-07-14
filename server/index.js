@@ -7,14 +7,52 @@ const morgan = require("morgan");
 const { getGeneralRateLimits } = require("./config/rateLimits");
 require("dotenv").config();
 
-const authMiddleware = require("./middleware/auth");
-const abuseDetection = require("./middleware/abuseDetection");
-const modelRateLimiting = require("./middleware/modelRateLimiting");
 const apiRoutes = require("./routes/api");
 const authRoutes = require("./routes/auth");
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 5000;
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+
+      const allowedOrigins = [
+        "http://localhost:3000",
+        "https://modelshift-bbcd8.web.app",
+        "https://modelshift-bbcd8.firebaseapp.com",
+        "https://modelshift-frontend.vercel.app",
+        "https://modelshift.vercel.app",
+        "https://modelshift-backend.vercel.app",
+        ...(origin &&
+        origin.match(
+          /^https:\/\/modelshift-backend-[a-z0-9\-]+-kenchenyan2006-gmailcoms-projects\.vercel\.app$/
+        )
+          ? [origin]
+          : []),
+      ];
+
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        return callback(null, true);
+      }
+
+      if (
+        process.env.NODE_ENV === "development" &&
+        origin.includes("localhost")
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 200,
+  })
+);
 
 app.use(
   helmet({
@@ -50,18 +88,6 @@ const limiter = rateLimit({
 });
 app.use("/api/", limiter);
 
-app.use(
-  cors({
-    origin:
-      process.env.NODE_ENV === "production"
-        ? ["https://yourdomain.com"]
-        : ["http://localhost:3000"],
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
-
 app.use(compression());
 app.use(morgan("combined"));
 app.use(express.json({ limit: "10mb" }));
@@ -78,6 +104,14 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api", apiRoutes);
 
@@ -90,8 +124,6 @@ app.get("/health", (req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error("Error:", err);
-
   if (err.name === "ValidationError") {
     return res.status(400).json({
       error: "Validation Error",
@@ -122,6 +154,8 @@ app.use("*", (req, res) => {
   });
 });
 
-app.listen(PORT, () => {});
+if (process.env.NODE_ENV !== "production") {
+  app.listen(PORT, () => {});
+}
 
 module.exports = app;

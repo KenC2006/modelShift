@@ -12,7 +12,6 @@ module.exports = async function (req, res, next) {
     req.user = decodedToken;
     next();
   } catch (err) {
-    console.error("Token verification error:", err);
     return res.status(401).json({ error: "Invalid token" });
   }
 };

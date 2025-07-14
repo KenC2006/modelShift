@@ -3,7 +3,6 @@ import { useComparisonSettings } from "../contexts/ComparisonSettingsContext";
 import {
   AlertCircle,
   Clock,
-  Zap,
   Copy,
   Check,
   Download,
@@ -71,11 +70,11 @@ const ComparisonResult = ({ result }) => {
   const getFontSize = () => {
     switch (settings.fontSize) {
       case "small":
-        return "text-sm";
+        return "text-size-small";
       case "large":
-        return "text-lg";
+        return "text-size-large";
       default:
-        return "text-base";
+        return "text-size-medium";
     }
   };
 
@@ -86,7 +85,13 @@ const ComparisonResult = ({ result }) => {
       toast.success("Response copied to clipboard");
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      toast.error("Failed to copy response");
+      if (error.name === "NotAllowedError") {
+        toast.error("Clipboard access denied. Please copy manually.");
+      } else if (error.name === "NotSupportedError") {
+        toast.error("Clipboard not supported. Please copy manually.");
+      } else {
+        toast.error("Failed to copy response. Please copy manually.");
+      }
     }
   };
 
@@ -191,7 +196,7 @@ const ComparisonResult = ({ result }) => {
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setShowMenu(!showMenu)}
-                className="p-1 hover:bg-theme-hover rounded transition-colors"
+                className="p-2 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover rounded-lg transition-colors"
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -200,7 +205,7 @@ const ComparisonResult = ({ result }) => {
                 <div className="absolute right-0 top-8 bg-theme-surface border border-theme-border rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
                   <button
                     onClick={copyToClipboard}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-theme-hover flex items-center"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-theme-surface-hover flex items-center transition-colors"
                   >
                     {copied ? (
                       <Check className="h-4 w-4 mr-2" />
@@ -211,7 +216,7 @@ const ComparisonResult = ({ result }) => {
                   </button>
                   <button
                     onClick={downloadResponse}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-theme-hover flex items-center"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-theme-surface-hover flex items-center transition-colors"
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Download

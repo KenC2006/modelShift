@@ -102,9 +102,7 @@ async function logAbuseAttempt(userId, type, details) {
       timestamp: new Date(),
       ip: "tracked_via_user_id",
     });
-  } catch (error) {
-    console.error("Failed to log abuse attempt:", error);
-  }
+  } catch (error) {}
 }
 
 module.exports = abuseDetection;

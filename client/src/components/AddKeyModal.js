@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Eye, EyeOff, Key } from "lucide-react";
-import axios from "axios";
+import { X, Eye, EyeOff, Key, AlertTriangle } from "lucide-react";
+import apiClient from "../config/api";
 import toast from "react-hot-toast";
+import { getDefaultRateLimit } from "../utils/defaultRateLimits";
 
 const AddKeyModal = ({ onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -10,9 +11,21 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
     key: "",
     provider: "openai",
     model: "",
+    rateLimits: {
+      requestsPerMinute: "",
+      requestsPerDay: "",
+      tokensPerMinute: "",
+      maxTokensPerRequest: "",
+    },
   });
   const [showKey, setShowKey] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [customRequestsPerMinute, setCustomRequestsPerMinute] = useState("");
+  const [customRequestsPerDay, setCustomRequestsPerDay] = useState("");
+  const [customTokensPerMinute, setCustomTokensPerMinute] = useState("");
+  const [customMaxTokensPerRequest, setCustomMaxTokensPerRequest] =
+    useState("");
+  const [showPricingWarning, setShowPricingWarning] = useState(false);
 
   const providers = [
     { value: "openai", label: "OpenAI", defaultModel: "gpt-4o" },
@@ -111,21 +124,69 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
       return;
     }
 
+    const currentProvider = providers.find(
+      (p) => p.value === formData.provider
+    );
+    const modelToUse = formData.model || currentProvider?.defaultModel;
+
+    // Prepare rate limits data
+    const rateLimits = {};
+    if (formData.rateLimits.requestsPerMinute === "custom") {
+      rateLimits.requestsPerMinute = parseInt(customRequestsPerMinute);
+    } else if (formData.rateLimits.requestsPerMinute === "unlimited") {
+      rateLimits.requestsPerMinute = null;
+    }
+
+    if (formData.rateLimits.requestsPerDay === "custom") {
+      rateLimits.requestsPerDay = parseInt(customRequestsPerDay);
+    } else if (formData.rateLimits.requestsPerDay === "unlimited") {
+      rateLimits.requestsPerDay = null;
+    }
+
+    if (formData.rateLimits.tokensPerMinute === "custom") {
+      rateLimits.tokensPerMinute = parseInt(customTokensPerMinute);
+    } else if (formData.rateLimits.tokensPerMinute === "unlimited") {
+      rateLimits.tokensPerMinute = null;
+    }
+
+    if (formData.rateLimits.maxTokensPerRequest === "custom") {
+      rateLimits.maxTokensPerRequest = parseInt(customMaxTokensPerRequest);
+    } else if (formData.rateLimits.maxTokensPerRequest === "unlimited") {
+      rateLimits.maxTokensPerRequest = null;
+    }
+
     try {
       setLoading(true);
-      await axios.post("/api/auth/api-keys", {
+      await apiClient.post("/api/auth/api-keys", {
         name: formData.name.trim(),
         key: formData.key.trim(),
         provider: formData.provider,
-        model:
-          formData.model ||
-          providers.find((p) => p.value === formData.provider)?.defaultModel,
+        model: modelToUse,
+        rateLimits: Object.keys(rateLimits).length > 0 ? rateLimits : undefined,
       });
 
       toast.success("API key added successfully");
       onSuccess();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to add API key");
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else if (error.response?.status === 400) {
+        toast.error(
+          "Invalid API key data. Please check your input and try again."
+        );
+      } else if (error.response?.status === 409) {
+        toast.error(
+          "An API key with this name already exists. Please choose a different name."
+        );
+      } else if (error.response?.status === 500) {
+        toast.error("Server error. Please try again later.");
+      } else if (error.code === "NETWORK_ERROR") {
+        toast.error(
+          "Network error. Please check your connection and try again."
+        );
+      } else {
+        toast.error("Failed to add API key. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -136,7 +197,46 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
       ...prev,
       provider,
       model: providers.find((p) => p.value === provider)?.defaultModel || "",
+      rateLimits: {
+        requestsPerMinute: "",
+        requestsPerDay: "",
+        tokensPerMinute: "",
+        maxTokensPerRequest: "",
+      },
     }));
+    setCustomRequestsPerMinute("");
+    setCustomRequestsPerDay("");
+    setCustomTokensPerMinute("");
+    setCustomMaxTokensPerRequest("");
+    setShowPricingWarning(false);
+  };
+
+  const getDropdownValue = (formValue) => {
+    if (formValue === "unlimited") return "unlimited";
+    if (formValue === "custom") return "custom";
+    return "default";
+  };
+
+  const shouldShowCustomInput = (formValue) => {
+    return formValue === "custom";
+  };
+
+  const handleRateLimitChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      rateLimits: {
+        ...prev.rateLimits,
+        [field]: value,
+      },
+    }));
+
+    // Show pricing warning if any rate limit is set to custom or unlimited
+    const hasCustomLimits = Object.values({
+      ...formData.rateLimits,
+      [field]: value,
+    }).some((val) => val === "custom" || val === "unlimited");
+
+    setShowPricingWarning(hasCustomLimits);
   };
 
   const getModelsForProvider = (provider) => {
@@ -156,6 +256,8 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
     const models = getModelsForProvider(formData.provider);
 
     if (models.length > 0) {
+      const selectedModel = models.find((m) => m.value === formData.model);
+
       return (
         <div>
           <label
@@ -178,10 +280,9 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
               </option>
             ))}
           </select>
-          {formData.model && (
+          {selectedModel && (
             <p className="text-xs text-theme-text-muted mt-1">
-              Free Rate:{" "}
-              {models.find((m) => m.value === formData.model)?.description}
+              {selectedModel.description}
             </p>
           )}
         </div>
@@ -228,7 +329,6 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Key Name */}
           <div>
             <label
               htmlFor="name"
@@ -249,7 +349,6 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
             />
           </div>
 
-          {/* Provider */}
           <div>
             <label
               htmlFor="provider"
@@ -271,10 +370,8 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
             </select>
           </div>
 
-          {/* Model - Dynamic based on provider */}
           {renderModelField()}
 
-          {/* API Key */}
           <div>
             <label
               htmlFor="key"
@@ -313,7 +410,230 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
             </p>
           </div>
 
-          {/* Actions */}
+          {/* Rate Limits Configuration */}
+          <div className="space-y-4 pt-4 border-t border-theme-border">
+            <h3 className="text-lg font-medium text-theme-text">
+              Rate Limits (Optional)
+            </h3>
+            <p className="text-sm text-theme-text-secondary">
+              Configure custom rate limits or leave as default. Default limits
+              ensure free API usage.
+            </p>
+
+            {/* Pricing Warning */}
+            {showPricingWarning && (
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h4 className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                      ⚠️ Pricing Warning
+                    </h4>
+                    <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                      Custom rate limits may result in expenses. Each AI
+                      provider charges per request and token usage. Higher
+                      limits can lead to increased charges on your API account.
+                      default limits make sure the api is completely free so
+                      consider starting with them.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-theme-text mb-2">
+                Requests per Minute
+              </label>
+              <select
+                value={getDropdownValue(formData.rateLimits.requestsPerMinute)}
+                onChange={(e) => {
+                  if (e.target.value === "unlimited") {
+                    handleRateLimitChange("requestsPerMinute", "unlimited");
+                  } else if (e.target.value === "default") {
+                    handleRateLimitChange("requestsPerMinute", "");
+                  } else {
+                    handleRateLimitChange("requestsPerMinute", "custom");
+                    setCustomRequestsPerMinute("");
+                  }
+                }}
+                className="input-field w-full mb-2"
+              >
+                <option value="default">
+                  Default (
+                  {(() => {
+                    const value = getDefaultRateLimit(
+                      formData.provider,
+                      formData.model ||
+                        providers.find((p) => p.value === formData.provider)
+                          ?.defaultModel,
+                      "requestsPerMinute"
+                    );
+                    return value ? value.toString() : "Unknown";
+                  })()}
+                  )
+                </option>
+                <option value="unlimited">Unlimited</option>
+                <option value="custom">Custom</option>
+              </select>
+
+              {shouldShowCustomInput(formData.rateLimits.requestsPerMinute) && (
+                <input
+                  type="text"
+                  value={customRequestsPerMinute}
+                  onChange={(e) => setCustomRequestsPerMinute(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="e.g., 20"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-theme-text mb-2">
+                Requests per Day
+              </label>
+              <select
+                value={getDropdownValue(formData.rateLimits.requestsPerDay)}
+                onChange={(e) => {
+                  if (e.target.value === "unlimited") {
+                    handleRateLimitChange("requestsPerDay", "unlimited");
+                  } else if (e.target.value === "default") {
+                    handleRateLimitChange("requestsPerDay", "");
+                  } else {
+                    handleRateLimitChange("requestsPerDay", "custom");
+                    setCustomRequestsPerDay("");
+                  }
+                }}
+                className="input-field w-full mb-2"
+              >
+                <option value="default">
+                  Default (
+                  {(() => {
+                    const value = getDefaultRateLimit(
+                      formData.provider,
+                      formData.model ||
+                        providers.find((p) => p.value === formData.provider)
+                          ?.defaultModel,
+                      "requestsPerDay"
+                    );
+                    return value ? value.toString() : "Unknown";
+                  })()}
+                  )
+                </option>
+                <option value="unlimited">Unlimited</option>
+                <option value="custom">Custom</option>
+              </select>
+
+              {shouldShowCustomInput(formData.rateLimits.requestsPerDay) && (
+                <input
+                  type="text"
+                  value={customRequestsPerDay}
+                  onChange={(e) => setCustomRequestsPerDay(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="e.g., 1000"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-theme-text mb-2">
+                Tokens per Minute
+              </label>
+              <select
+                value={getDropdownValue(formData.rateLimits.tokensPerMinute)}
+                onChange={(e) => {
+                  if (e.target.value === "unlimited") {
+                    handleRateLimitChange("tokensPerMinute", "unlimited");
+                  } else if (e.target.value === "default") {
+                    handleRateLimitChange("tokensPerMinute", "");
+                  } else {
+                    handleRateLimitChange("tokensPerMinute", "custom");
+                    setCustomTokensPerMinute("");
+                  }
+                }}
+                className="input-field w-full mb-2"
+              >
+                <option value="default">
+                  Default (
+                  {(() => {
+                    const value = getDefaultRateLimit(
+                      formData.provider,
+                      formData.model ||
+                        providers.find((p) => p.value === formData.provider)
+                          ?.defaultModel,
+                      "tokensPerMinute"
+                    );
+                    return value ? `${(value / 1000).toFixed(0)}k` : "Unknown";
+                  })()}
+                  )
+                </option>
+                <option value="unlimited">Unlimited</option>
+                <option value="custom">Custom</option>
+              </select>
+
+              {shouldShowCustomInput(formData.rateLimits.tokensPerMinute) && (
+                <input
+                  type="text"
+                  value={customTokensPerMinute}
+                  onChange={(e) => setCustomTokensPerMinute(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="e.g., 100000 or 100k"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-theme-text mb-2">
+                Max Tokens per Request
+              </label>
+              <select
+                value={getDropdownValue(
+                  formData.rateLimits.maxTokensPerRequest
+                )}
+                onChange={(e) => {
+                  if (e.target.value === "unlimited") {
+                    handleRateLimitChange("maxTokensPerRequest", "unlimited");
+                  } else if (e.target.value === "default") {
+                    handleRateLimitChange("maxTokensPerRequest", "");
+                  } else {
+                    handleRateLimitChange("maxTokensPerRequest", "custom");
+                    setCustomMaxTokensPerRequest("");
+                  }
+                }}
+                className="input-field w-full mb-2"
+              >
+                <option value="default">
+                  Default (
+                  {(() => {
+                    const value = getDefaultRateLimit(
+                      formData.provider,
+                      formData.model ||
+                        providers.find((p) => p.value === formData.provider)
+                          ?.defaultModel,
+                      "maxTokensPerRequest"
+                    );
+                    return value ? `${(value / 1000).toFixed(0)}k` : "Unknown";
+                  })()}
+                  )
+                </option>
+                <option value="unlimited">Unlimited</option>
+                <option value="custom">Custom</option>
+              </select>
+
+              {shouldShowCustomInput(
+                formData.rateLimits.maxTokensPerRequest
+              ) && (
+                <input
+                  type="text"
+                  value={customMaxTokensPerRequest}
+                  onChange={(e) => setCustomMaxTokensPerRequest(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="e.g., 4000 or 4k"
+                />
+              )}
+            </div>
+          </div>
+
           <div className="flex space-x-3 pt-4">
             <button
               type="button"
@@ -325,10 +645,7 @@ const AddKeyModal = ({ onClose, onSuccess }) => {
             <button
               type="submit"
               disabled={
-                loading ||
-                !formData.name.trim() ||
-                !formData.key.trim() ||
-                !formData.model.trim()
+                loading || !formData.name.trim() || !formData.key.trim()
               }
               className="flex-1 btn btn-primary inline-flex items-center justify-center"
             >

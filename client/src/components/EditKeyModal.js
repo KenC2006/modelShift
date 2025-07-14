@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Save } from "lucide-react";
-import axios from "axios";
+import { X, Save, AlertTriangle } from "lucide-react";
+import apiClient from "../config/api";
 import toast from "react-hot-toast";
 import { getDefaultRateLimit } from "../utils/defaultRateLimits";
 
@@ -24,12 +24,14 @@ const EditKeyModal = ({ keyData, onClose, onSuccess }) => {
   const [customTokensPerMinute, setCustomTokensPerMinute] = useState("");
   const [customMaxTokensPerRequest, setCustomMaxTokensPerRequest] =
     useState("");
+  const [showPricingWarning, setShowPricingWarning] = useState(false);
 
   useEffect(() => {
     if (keyData) {
       const getFormValue = (value, field) => {
-        if (value === null || value === undefined) return null;
-        if (value === "" || value === 0) return "";
+        if (value === null) return null; // unlimited
+        if (value === undefined) return ""; // default
+        if (value === "" || value === 0) return ""; // default
 
         const defaultValue = getDefaultRateLimit(
           keyData.provider,
@@ -38,7 +40,7 @@ const EditKeyModal = ({ keyData, onClose, onSuccess }) => {
         );
 
         if (defaultValue !== null && parseInt(value) === defaultValue) {
-          return "";
+          return ""; // default
         }
 
         return "custom";
@@ -89,6 +91,28 @@ const EditKeyModal = ({ keyData, onClose, onSuccess }) => {
         keyData.rateLimits?.maxTokensPerRequest,
         setCustomMaxTokensPerRequest
       );
+
+      // Check if there are any custom limits to show pricing warning
+      const hasCustomLimits = Object.values({
+        requestsPerMinute: getFormValue(
+          keyData.rateLimits?.requestsPerMinute,
+          "requestsPerMinute"
+        ),
+        requestsPerDay: getFormValue(
+          keyData.rateLimits?.requestsPerDay,
+          "requestsPerDay"
+        ),
+        tokensPerMinute: getFormValue(
+          keyData.rateLimits?.tokensPerMinute,
+          "tokensPerMinute"
+        ),
+        maxTokensPerRequest: getFormValue(
+          keyData.rateLimits?.maxTokensPerRequest,
+          "maxTokensPerRequest"
+        ),
+      }).some((val) => val === "custom" || val === null);
+
+      setShowPricingWarning(hasCustomLimits);
     }
   }, [keyData]);
 
@@ -112,6 +136,15 @@ const EditKeyModal = ({ keyData, onClose, onSuccess }) => {
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
+
+    // Show pricing warning if any rate limit is set to custom or unlimited
+    const hasCustomLimits = Object.values({
+      ...formData.rateLimits,
+      maxTokensPerRequest: formData.maxTokensPerRequest,
+      [field]: value,
+    }).some((val) => val === "custom" || val === null);
+
+    setShowPricingWarning(hasCustomLimits);
   };
 
   const getDropdownValue = (formValue) => {
@@ -200,40 +233,72 @@ const EditKeyModal = ({ keyData, onClose, onSuccess }) => {
       const updateData = {
         name: formData.name.trim(),
         model: formData.model.trim(),
-        rateLimits: {
-          requestsPerMinute:
-            formData.rateLimits.requestsPerMinute === ""
-              ? ""
-              : formData.rateLimits.requestsPerMinute === "custom"
-              ? customRequestsPerMinute
-              : formData.rateLimits.requestsPerMinute,
-          requestsPerDay:
-            formData.rateLimits.requestsPerDay === ""
-              ? ""
-              : formData.rateLimits.requestsPerDay === "custom"
-              ? customRequestsPerDay
-              : formData.rateLimits.requestsPerDay,
-          tokensPerMinute:
-            formData.rateLimits.tokensPerMinute === ""
-              ? ""
-              : formData.rateLimits.tokensPerMinute === "custom"
-              ? customTokensPerMinute
-              : formData.rateLimits.tokensPerMinute,
-          maxTokensPerRequest:
-            formData.maxTokensPerRequest === ""
-              ? ""
-              : formData.maxTokensPerRequest === "custom"
-              ? customMaxTokensPerRequest
-              : formData.maxTokensPerRequest,
-        },
+        rateLimits: {},
       };
 
-      await axios.put(`/api/auth/api-keys/${keyData.id}`, updateData);
+      // Only include rate limits that are actually set
+      if (formData.rateLimits.requestsPerMinute === "custom") {
+        updateData.rateLimits.requestsPerMinute = parseInt(
+          customRequestsPerMinute
+        );
+      } else if (formData.rateLimits.requestsPerMinute === null) {
+        updateData.rateLimits.requestsPerMinute = null;
+      } else if (formData.rateLimits.requestsPerMinute === "") {
+        // For default values, we'll send a special marker that the server can recognize
+        updateData.rateLimits.requestsPerMinute = "DEFAULT";
+      }
+
+      if (formData.rateLimits.requestsPerDay === "custom") {
+        updateData.rateLimits.requestsPerDay = parseInt(customRequestsPerDay);
+      } else if (formData.rateLimits.requestsPerDay === null) {
+        updateData.rateLimits.requestsPerDay = null;
+      } else if (formData.rateLimits.requestsPerDay === "") {
+        updateData.rateLimits.requestsPerDay = "DEFAULT";
+      }
+
+      if (formData.rateLimits.tokensPerMinute === "custom") {
+        updateData.rateLimits.tokensPerMinute = parseInt(customTokensPerMinute);
+      } else if (formData.rateLimits.tokensPerMinute === null) {
+        updateData.rateLimits.tokensPerMinute = null;
+      } else if (formData.rateLimits.tokensPerMinute === "") {
+        updateData.rateLimits.tokensPerMinute = "DEFAULT";
+      }
+
+      if (formData.maxTokensPerRequest === "custom") {
+        updateData.rateLimits.maxTokensPerRequest = parseInt(
+          customMaxTokensPerRequest
+        );
+      } else if (formData.maxTokensPerRequest === null) {
+        updateData.rateLimits.maxTokensPerRequest = null;
+      } else if (formData.maxTokensPerRequest === "") {
+        updateData.rateLimits.maxTokensPerRequest = "DEFAULT";
+      }
+
+      // Only include rateLimits if it has any properties
+      if (Object.keys(updateData.rateLimits).length === 0) {
+        delete updateData.rateLimits;
+      }
+
+      await apiClient.put(`/api/auth/api-keys/${keyData.id}`, updateData);
 
       toast.success("API key updated successfully");
       onSuccess();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to update API key");
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else if (error.response?.status === 400) {
+        toast.error("Invalid data. Please check your input and try again.");
+      } else if (error.response?.status === 404) {
+        toast.error("API key not found. It may have been deleted.");
+      } else if (error.response?.status === 500) {
+        toast.error("Server error. Please try again later.");
+      } else if (error.code === "NETWORK_ERROR") {
+        toast.error(
+          "Network error. Please check your connection and try again."
+        );
+      } else {
+        toast.error("Failed to update API key. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -301,6 +366,27 @@ const EditKeyModal = ({ keyData, onClose, onSuccess }) => {
           {/* Rate Limits */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-theme-text">Rate Limits</h3>
+
+            {/* Pricing Warning */}
+            {showPricingWarning && (
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h4 className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                      ⚠️ Pricing Warning
+                    </h4>
+                    <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                      Custom rate limits may result in higher costs. Each AI
+                      provider charges per request and token usage. Higher
+                      limits can lead to increased charges on your API account.
+                      Consider starting with default limits and adjusting based
+                      on your usage patterns.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-theme-text mb-2">

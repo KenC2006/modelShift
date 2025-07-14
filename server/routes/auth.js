@@ -15,9 +15,9 @@ router.get("/verify", authenticateToken, async (req, res) => {
         .collection("users")
         .doc(req.user.uid)
         .set({
-          email: req.user.email,
-          name: req.user.name,
-          picture: req.user.picture,
+          email: req.user.email || "",
+          name: req.user.name || "",
+          picture: req.user.picture || "",
           createdAt: new Date(),
           lastLogin: new Date(),
           apiKeys: [],
@@ -60,7 +60,6 @@ router.get("/verify", authenticateToken, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error verifying user:", error);
     res.status(500).json({
       error: "Internal Server Error",
       message: "Failed to verify user",
@@ -105,7 +104,6 @@ router.post(
       try {
         encryptedKey = encrypt(key);
       } catch (error) {
-        console.error("Encryption error:", error);
         return res.status(500).json({
           error: "Encryption Error",
           message: "Failed to encrypt API key",
@@ -123,6 +121,12 @@ router.post(
         });
       }
 
+      const { getModelRateLimits } = require("../config/rateLimits");
+      const defaultRateLimits = getModelRateLimits(
+        provider,
+        model || getDefaultModel(provider)
+      );
+
       const newKey = {
         id: Date.now().toString(),
         name,
@@ -136,6 +140,12 @@ router.post(
           requests: 0,
           tokens: 0,
           errors: 0,
+        },
+        rateLimits: {
+          requestsPerMinute: defaultRateLimits.requestsPerMinute,
+          requestsPerDay: defaultRateLimits.requestsPerDay,
+          tokensPerMinute: defaultRateLimits.tokensPerMinute,
+          maxTokensPerRequest: defaultRateLimits.maxTokensPerRequest,
         },
       };
 
@@ -157,7 +167,6 @@ router.post(
         },
       });
     } catch (error) {
-      console.error("Error adding API key:", error);
       res.status(500).json({
         error: "Internal Server Error",
         message: "Failed to add API key",
@@ -180,21 +189,25 @@ router.get("/api-keys", authenticateToken, async (req, res) => {
 
       const rateLimits = {
         requestsPerMinute:
-          customRateLimits.requestsPerMinute !== undefined
+          customRateLimits.requestsPerMinute !== undefined &&
+          customRateLimits.requestsPerMinute !== null
             ? customRateLimits.requestsPerMinute
-            : "",
+            : defaultRateLimits.requestsPerMinute,
         requestsPerDay:
-          customRateLimits.requestsPerDay !== undefined
+          customRateLimits.requestsPerDay !== undefined &&
+          customRateLimits.requestsPerDay !== null
             ? customRateLimits.requestsPerDay
-            : "",
+            : defaultRateLimits.requestsPerDay,
         tokensPerMinute:
-          customRateLimits.tokensPerMinute !== undefined
+          customRateLimits.tokensPerMinute !== undefined &&
+          customRateLimits.tokensPerMinute !== null
             ? customRateLimits.tokensPerMinute
-            : "",
+            : defaultRateLimits.tokensPerMinute,
         maxTokensPerRequest:
-          customRateLimits.maxTokensPerRequest !== undefined
+          customRateLimits.maxTokensPerRequest !== undefined &&
+          customRateLimits.maxTokensPerRequest !== null
             ? customRateLimits.maxTokensPerRequest
-            : "",
+            : defaultRateLimits.maxTokensPerRequest,
       };
 
       return {
@@ -212,7 +225,6 @@ router.get("/api-keys", authenticateToken, async (req, res) => {
 
     res.json({ apiKeys: safeKeys });
   } catch (error) {
-    console.error("Error getting API keys:", error);
     res.status(500).json({
       error: "Internal Server Error",
       message: "Failed to get API keys",
@@ -245,7 +257,13 @@ router.put(
     body("rateLimits.requestsPerMinute")
       .optional()
       .custom((value) => {
-        if (value === undefined || value === null || value === "") return true;
+        if (
+          value === undefined ||
+          value === null ||
+          value === "" ||
+          value === "DEFAULT"
+        )
+          return true;
         const num = parseInt(value);
         return !isNaN(num) && num >= 1;
       })
@@ -253,7 +271,13 @@ router.put(
     body("rateLimits.requestsPerDay")
       .optional()
       .custom((value) => {
-        if (value === undefined || value === null || value === "") return true;
+        if (
+          value === undefined ||
+          value === null ||
+          value === "" ||
+          value === "DEFAULT"
+        )
+          return true;
         const num = parseInt(value);
         return !isNaN(num) && num >= 1;
       })
@@ -261,7 +285,13 @@ router.put(
     body("rateLimits.tokensPerMinute")
       .optional()
       .custom((value) => {
-        if (value === undefined || value === null || value === "") return true;
+        if (
+          value === undefined ||
+          value === null ||
+          value === "" ||
+          value === "DEFAULT"
+        )
+          return true;
         const num = parseInt(value);
         return !isNaN(num) && num >= 1;
       })
@@ -269,7 +299,13 @@ router.put(
     body("rateLimits.maxTokensPerRequest")
       .optional()
       .custom((value) => {
-        if (value === undefined || value === null || value === "") return true;
+        if (
+          value === undefined ||
+          value === null ||
+          value === "" ||
+          value === "DEFAULT"
+        )
+          return true;
         const num = parseInt(value);
         return !isNaN(num) && num >= 1;
       })
@@ -322,22 +358,19 @@ router.put(
 
       if (rateLimits !== undefined) {
         const currentRateLimits = apiKeys[keyIndex].rateLimits || {};
-        const newRateLimits = { ...currentRateLimits };
+        const updatedRateLimits = { ...currentRateLimits };
 
-        if (rateLimits.requestsPerMinute !== undefined) {
-          newRateLimits.requestsPerMinute = rateLimits.requestsPerMinute;
-        }
-        if (rateLimits.requestsPerDay !== undefined) {
-          newRateLimits.requestsPerDay = rateLimits.requestsPerDay;
-        }
-        if (rateLimits.tokensPerMinute !== undefined) {
-          newRateLimits.tokensPerMinute = rateLimits.tokensPerMinute;
-        }
-        if (rateLimits.maxTokensPerRequest !== undefined) {
-          newRateLimits.maxTokensPerRequest = rateLimits.maxTokensPerRequest;
-        }
+        // Only update properties that are explicitly provided
+        Object.keys(rateLimits).forEach((key) => {
+          if (rateLimits[key] === "DEFAULT") {
+            // Remove the property to use default values
+            delete updatedRateLimits[key];
+          } else if (rateLimits[key] !== undefined) {
+            updatedRateLimits[key] = rateLimits[key];
+          }
+        });
 
-        apiKeys[keyIndex].rateLimits = newRateLimits;
+        apiKeys[keyIndex].rateLimits = updatedRateLimits;
       }
 
       await db.collection("users").doc(req.user.uid).update({
@@ -359,8 +392,6 @@ router.put(
         },
       });
     } catch (error) {
-      console.error("Error updating API key:", error);
-      console.error("Error details:", error.message);
       res.status(500).json({
         error: "Internal Server Error",
         message: "Failed to update API key",
@@ -393,7 +424,6 @@ router.delete("/api-keys/:keyId", authenticateToken, async (req, res) => {
 
     res.json({ message: "API key deleted successfully" });
   } catch (error) {
-    console.error("Error deleting API key:", error);
     res.status(500).json({
       error: "Internal Server Error",
       message: "Failed to delete API key",

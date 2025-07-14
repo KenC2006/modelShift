@@ -15,7 +15,7 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import { auth } from "../firebase";
-import axios from "axios";
+import apiClient from "../config/api";
 
 const AuthContext = createContext();
 
@@ -27,31 +27,6 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  axios.defaults.baseURL =
-    process.env.REACT_APP_API_URL || "http://localhost:5000";
-
-  axios.interceptors.request.use(
-    async (config) => {
-      if (currentUser) {
-        config.headers.Authorization = `Bearer ${await currentUser.getIdToken()}`;
-      }
-      return config;
-    },
-    (error) => {
-      return Promise.reject(error);
-    }
-  );
-
-  axios.interceptors.response.use(
-    (response) => response,
-    (error) => {
-      if (error.response?.status === 401) {
-        signOut(auth);
-      }
-      return Promise.reject(error);
-    }
-  );
 
   async function signInWithGoogle() {
     const provider = new GoogleAuthProvider();
@@ -67,7 +42,22 @@ export function AuthProvider({ children }) {
       const result = await signInWithEmailAndPassword(auth, email, password);
       return result.user;
     } catch (error) {
-      throw error;
+      let message = "An unknown error occurred. Please try again.";
+      if (error.code === "auth/user-not-found") {
+        message = "No user found with this email address.";
+      } else if (error.code === "auth/wrong-password") {
+        message = "Incorrect password. Please try again.";
+      } else if (error.code === "auth/invalid-email") {
+        message = "Invalid email address format.";
+      } else if (error.code === "auth/too-many-requests") {
+        message =
+          "Too many failed login attempts. Please try again later or reset your password.";
+      } else if (error.code === "auth/network-request-failed") {
+        message = "Network error. Please check your connection and try again.";
+      } else if (error.code === "auth/internal-error") {
+        message = "Internal error. Please try again later.";
+      }
+      throw new Error(message);
     }
   }
 
@@ -99,11 +89,7 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const token = await currentUser.getIdToken();
-      const response = await axios.get("/api/auth/verify", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+      const response = await apiClient.get("/api/auth/verify");
       setUserData(response.data.user);
       return response.data.user;
     } catch (error) {

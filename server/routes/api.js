@@ -7,6 +7,7 @@ const authenticateToken = require("../middleware/auth");
 const { checkRateLimits } = require("../middleware/modelRateLimiting");
 const OpenAI = require("openai");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const Anthropic = require("@anthropic-ai/sdk");
 
 const router = express.Router();
 
@@ -94,7 +95,6 @@ router.post(
       try {
         decryptedKey = decrypt(selectedKey.encryptedKey);
       } catch (error) {
-        console.error("Decryption error:", error);
         return res.status(500).json({
           error: "Decryption Error",
           message: "Failed to decrypt API key",
@@ -137,7 +137,6 @@ router.post(
             try {
               fallbackDecryptedKey = decrypt(fallbackKey.encryptedKey);
             } catch (error) {
-              console.error("Fallback decryption error:", error);
               error = new Error("Failed to decrypt fallback API key");
             }
 
@@ -198,7 +197,6 @@ router.post(
         tokensUsed,
       });
     } catch (error) {
-      console.error("Chat error:", error);
       res.status(500).json({
         error: "Internal Server Error",
         message: "Failed to process chat request",
@@ -234,7 +232,6 @@ router.get("/usage", async (req, res) => {
       }),
     });
   } catch (error) {
-    console.error("Error getting usage stats:", error);
     res.status(500).json({
       error: "Internal Server Error",
       message: "Failed to get usage statistics",
@@ -351,7 +348,27 @@ async function callGemini(apiKey, model, message, modelLimits, customSettings) {
 }
 
 async function callClaude(apiKey, model, message, modelLimits, customSettings) {
-  throw new Error("Claude API not yet implemented");
+  const anthropic = new Anthropic({
+    apiKey: apiKey,
+  });
+
+  const response = await anthropic.messages.create({
+    model: model || "claude-3-5-sonnet-20241022",
+    max_tokens: modelLimits.maxTokensPerRequest || 200000,
+    messages: [
+      {
+        role: "user",
+        content: message,
+      },
+    ],
+    system: customSettings.systemPrompt,
+    temperature: customSettings?.temperature || 0.7,
+  });
+
+  return {
+    response: response.content[0].text,
+    tokens: response.usage.input_tokens + response.usage.output_tokens,
+  };
 }
 
 async function updateUsageStats(userId, keyId, tokensUsed, errors = 0) {
@@ -391,9 +408,7 @@ async function updateUsageStats(userId, keyId, tokensUsed, errors = 0) {
       usageStats: userStats,
       apiKeys: apiKeys,
     });
-  } catch (error) {
-    console.error("Error updating usage stats:", error);
-  }
+  } catch (error) {}
 }
 
 module.exports = router;

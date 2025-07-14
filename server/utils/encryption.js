@@ -3,7 +3,12 @@ const crypto = require("crypto");
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
 if (!ENCRYPTION_KEY) {
-  throw new Error("ENCRYPTION_KEY environment variable is required");
+  if (process.env.NODE_ENV === "development") {
+    process.env.ENCRYPTION_KEY =
+      "dGVzdC1lbmNyeXB0aW9uLWtleS1mb3ItZGV2ZWxvcG1lbnQ=";
+  } else {
+    throw new Error("ENCRYPTION_KEY environment variable is required");
+  }
 }
 
 const keyBuffer = Buffer.from(ENCRYPTION_KEY, "base64");
@@ -31,7 +36,6 @@ function encrypt(text) {
 
     return Buffer.from(result).toString("base64");
   } catch (error) {
-    console.error("Encryption error:", error);
     throw new Error("Failed to encrypt API key");
   }
 }
@@ -56,7 +60,6 @@ function decrypt(encryptedText) {
 
     return decrypted;
   } catch (error) {
-    console.error("Decryption error:", error);
     throw new Error("Failed to decrypt API key");
   }
 }

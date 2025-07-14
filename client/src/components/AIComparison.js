@@ -3,7 +3,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useComparisonSettings } from "../contexts/ComparisonSettingsContext";
 import ComparisonResult from "./ComparisonResult";
 import LoadingSpinner from "./LoadingSpinner";
-import axios from "axios";
+import apiClient from "../config/api";
 import toast from "react-hot-toast";
 import {
   Send,
@@ -89,12 +89,11 @@ const AIComparison = () => {
     try {
       const requests = selectedKeys.map(async (keyId) => {
         try {
-          const response = await axios.post("/api/chat", {
+          const response = await apiClient.post("/api/chat", {
             message: inputPrompt,
             keyId: keyId,
             systemPrompt: settings.systemPrompt,
             temperature: settings.temperature,
-            maxTokens: settings.maxTokens,
           });
 
           return {
@@ -139,7 +138,21 @@ const AIComparison = () => {
       setComparisons((prev) => [...prev, ...comparisonResults]);
       await refreshUserData();
     } catch (error) {
-      toast.error("Failed to send prompt to AIs");
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else if (error.response?.status === 400) {
+        toast.error("Invalid request. Please check your prompt and try again.");
+      } else if (error.response?.status === 429) {
+        toast.error("Rate limit exceeded. Please wait a moment and try again.");
+      } else if (error.response?.status === 500) {
+        toast.error("AI service error. Please try again later.");
+      } else if (error.code === "NETWORK_ERROR") {
+        toast.error(
+          "Network error. Please check your connection and try again."
+        );
+      } else {
+        toast.error("Failed to send prompt to AIs. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }

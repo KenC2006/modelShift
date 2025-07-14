@@ -15,7 +15,6 @@ export function ComparisonSettingsProvider({ children }) {
     showTimestamps: true,
     showProviderInfo: true,
     showTokenCount: true,
-    showMessageActions: true,
 
     systemPrompt:
       "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.",
@@ -25,11 +24,6 @@ export function ComparisonSettingsProvider({ children }) {
     animations: true,
     autoScroll: true,
     markdownRendering: true,
-
-    defaultMaxComparisons: 3,
-    showResponseTime: true,
-    highlightDifferences: false,
-    autoExpandResponses: false,
   });
 
   useEffect(() => {
@@ -62,7 +56,6 @@ export function ComparisonSettingsProvider({ children }) {
       showTimestamps: true,
       showProviderInfo: true,
       showTokenCount: true,
-      showMessageActions: true,
       systemPrompt:
         "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.",
       temperature: 0.7,
@@ -70,10 +63,6 @@ export function ComparisonSettingsProvider({ children }) {
       animations: true,
       autoScroll: true,
       markdownRendering: true,
-      defaultMaxComparisons: 3,
-      showResponseTime: true,
-      highlightDifferences: false,
-      autoExpandResponses: false,
     };
     setSettings(defaultSettings);
   };

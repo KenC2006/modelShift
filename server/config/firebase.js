@@ -1,5 +1,17 @@
 const admin = require("firebase-admin");
 
+if (!process.env.FIREBASE_PROJECT_ID) {
+  throw new Error("FIREBASE_PROJECT_ID environment variable is required");
+}
+
+if (!process.env.FIREBASE_PRIVATE_KEY) {
+  throw new Error("FIREBASE_PRIVATE_KEY environment variable is required");
+}
+
+if (!process.env.FIREBASE_CLIENT_EMAIL) {
+  throw new Error("FIREBASE_CLIENT_EMAIL environment variable is required");
+}
+
 const serviceAccount = {
   type: "service_account",
   project_id: process.env.FIREBASE_PROJECT_ID,

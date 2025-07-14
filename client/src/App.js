@@ -26,10 +26,10 @@ function AppContent() {
     }
 
     document.body.className = document.body.className.replace(
-      /font-size-\w+/g,
+      /text-size-\w+/g,
       ""
     );
-    document.body.classList.add(`font-size-${settings.fontSize}`);
+    document.body.classList.add(`text-size-${settings.fontSize}`);
 
     if (!settings.animations) {
       document.documentElement.style.setProperty("--transition-fast", "0ms");

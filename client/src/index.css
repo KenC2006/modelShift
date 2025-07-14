@@ -61,7 +61,7 @@
   /* Dark theme semantic colors */
   --color-primary: #60a5fa;
   --color-primary-hover: #3b82f6;
-  --color-success: #4ade80;
+  --color-success: #16a34a;
   --color-warning: #fbbf24;
   --color-error: #f87171;
 
@@ -189,8 +189,8 @@
   }
 
   .btn-success:hover:not(:disabled) {
-    background-color: #16a34a;
-    border-color: #16a34a;
+    background-color: #15803d;
+    border-color: #15803d;
   }
 
   /* Form Components */
@@ -593,5 +593,46 @@
   .text-size-large {
     font-size: 1.125rem;
     line-height: 1.75rem;
+  }
+
+  /* Compact mode styles */
+  .compact-mode {
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 0.75rem;
+    --spacing-lg: 1rem;
+    --spacing-xl: 1.25rem;
+  }
+
+  .compact-mode .p-4 {
+    padding: var(--spacing-md);
+  }
+
+  .compact-mode .p-6 {
+    padding: var(--spacing-lg);
+  }
+
+  .compact-mode .space-y-4 > * + * {
+    margin-top: var(--spacing-sm);
+  }
+
+  .compact-mode .space-y-6 > * + * {
+    margin-top: var(--spacing-md);
+  }
+
+  .compact-mode .mb-4 {
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .compact-mode .mb-6 {
+    margin-bottom: var(--spacing-md);
+  }
+
+  .compact-mode .gap-4 {
+    gap: var(--spacing-sm);
+  }
+
+  .compact-mode .gap-6 {
+    gap: var(--spacing-md);
   }
 }

@@ -7,11 +7,10 @@ import {
   ToggleRight,
   BarChart3,
   Zap,
-  Clock,
   AlertCircle,
   Edit,
 } from "lucide-react";
-import axios from "axios";
+import apiClient from "../config/api";
 import toast from "react-hot-toast";
 import AddKeyModal from "./AddKeyModal";
 import EditKeyModal from "./EditKeyModal";
@@ -31,7 +30,7 @@ const KeyManager = () => {
 
   const fetchUsageStats = async () => {
     try {
-      const response = await axios.get("/api/chat/usage");
+      const response = await apiClient.get("/api/chat/usage");
       setUsageStats(response.data);
     } catch (error) {}
   };
@@ -47,12 +46,24 @@ const KeyManager = () => {
 
     try {
       setLoading(true);
-      await axios.delete(`/api/auth/api-keys/${keyId}`);
+      await apiClient.delete(`/api/auth/api-keys/${keyId}`);
       await refreshUserData();
       await fetchUsageStats();
       toast.success("API key deleted successfully");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to delete API key");
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else if (error.response?.status === 404) {
+        toast.error("API key not found. It may have already been deleted.");
+      } else if (error.response?.status === 500) {
+        toast.error("Server error. Please try again later.");
+      } else if (error.code === "NETWORK_ERROR") {
+        toast.error(
+          "Network error. Please check your connection and try again."
+        );
+      } else {
+        toast.error("Failed to delete API key. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -61,14 +72,28 @@ const KeyManager = () => {
   const handleToggleKey = async (keyId, isActive) => {
     try {
       setLoading(true);
-      await axios.put(`/api/auth/api-keys/${keyId}`, { isActive: !isActive });
+      await apiClient.put(`/api/auth/api-keys/${keyId}`, {
+        isActive: !isActive,
+      });
       await refreshUserData();
       await fetchUsageStats();
       toast.success(
         `API key ${!isActive ? "activated" : "deactivated"} successfully`
       );
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to update API key");
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else if (error.response?.status === 404) {
+        toast.error("API key not found. It may have been deleted.");
+      } else if (error.response?.status === 500) {
+        toast.error("Server error. Please try again later.");
+      } else if (error.code === "NETWORK_ERROR") {
+        toast.error(
+          "Network error. Please check your connection and try again."
+        );
+      } else {
+        toast.error("Failed to update API key. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -123,51 +148,13 @@ const KeyManager = () => {
     });
   };
 
-  const formatLastUsed = (dateInput) => {
-    if (!dateInput) return "Never";
-
-    let date;
-    if (dateInput.toDate) {
-      date = dateInput.toDate();
-    } else if (dateInput.seconds) {
-      date = new Date(dateInput.seconds * 1000);
-    } else {
-      date = new Date(dateInput);
-    }
-
-    if (isNaN(date.getTime())) {
-      return "Invalid date";
-    }
-
-    const now = new Date();
-    const diffInMs = now - date;
-    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
-    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-
-    if (diffInMinutes < 1) return "Just now";
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    if (diffInDays < 7) return `${diffInDays}d ago`;
-
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
   const formatRateLimits = (rateLimits, provider, model) => {
-    if (!rateLimits) return "Default limits";
-
     const limits = [];
 
-    if (rateLimits.requestsPerMinute === null) {
+    const requestsPerMinute = rateLimits?.requestsPerMinute;
+    if (requestsPerMinute === null) {
       limits.push("∞/min");
-    } else if (
-      rateLimits.requestsPerMinute === "" ||
-      rateLimits.requestsPerMinute === undefined
-    ) {
+    } else if (requestsPerMinute === undefined) {
       const defaultRpm = getDefaultRateLimit(
         provider,
         model,
@@ -179,15 +166,13 @@ const KeyManager = () => {
         limits.push("∞/min");
       }
     } else {
-      limits.push(`${rateLimits.requestsPerMinute}/min`);
+      limits.push(`${requestsPerMinute}/min`);
     }
 
-    if (rateLimits.requestsPerDay === null) {
+    const requestsPerDay = rateLimits?.requestsPerDay;
+    if (requestsPerDay === null) {
       limits.push("∞/day");
-    } else if (
-      rateLimits.requestsPerDay === "" ||
-      rateLimits.requestsPerDay === undefined
-    ) {
+    } else if (requestsPerDay === undefined) {
       const defaultRpd = getDefaultRateLimit(provider, model, "requestsPerDay");
       if (defaultRpd && !isNaN(defaultRpd)) {
         limits.push(`${defaultRpd}/day`);
@@ -195,15 +180,13 @@ const KeyManager = () => {
         limits.push("∞/day");
       }
     } else {
-      limits.push(`${rateLimits.requestsPerDay}/day`);
+      limits.push(`${requestsPerDay}/day`);
     }
 
-    if (rateLimits.tokensPerMinute === null) {
+    const tokensPerMinute = rateLimits?.tokensPerMinute;
+    if (tokensPerMinute === null) {
       limits.push("∞ tokens/min");
-    } else if (
-      rateLimits.tokensPerMinute === "" ||
-      rateLimits.tokensPerMinute === undefined
-    ) {
+    } else if (tokensPerMinute === undefined) {
       const defaultTpm = getDefaultRateLimit(
         provider,
         model,
@@ -215,17 +198,13 @@ const KeyManager = () => {
         limits.push("∞ tokens/min");
       }
     } else {
-      limits.push(
-        `${(rateLimits.tokensPerMinute / 1000).toFixed(0)}k tokens/min`
-      );
+      limits.push(`${(tokensPerMinute / 1000).toFixed(0)}k tokens/min`);
     }
 
-    if (rateLimits.maxTokensPerRequest === null) {
+    const maxTokensPerRequest = rateLimits?.maxTokensPerRequest;
+    if (maxTokensPerRequest === null) {
       limits.push("∞ tokens/req");
-    } else if (
-      rateLimits.maxTokensPerRequest === "" ||
-      rateLimits.maxTokensPerRequest === undefined
-    ) {
+    } else if (maxTokensPerRequest === undefined) {
       const defaultMtpr = getDefaultRateLimit(
         provider,
         model,
@@ -237,9 +216,7 @@ const KeyManager = () => {
         limits.push("∞ tokens/req");
       }
     } else {
-      limits.push(
-        `${(rateLimits.maxTokensPerRequest / 1000).toFixed(0)}k tokens/req`
-      );
+      limits.push(`${(maxTokensPerRequest / 1000).toFixed(0)}k tokens/req`);
     }
 
     return limits.join(" • ");
@@ -371,15 +348,13 @@ const KeyManager = () => {
                       <p className="text-sm text-theme-text-secondary">
                         {key.provider} • {key.model}
                       </p>
-                      {key.rateLimits && (
-                        <p className="text-xs text-theme-text-tertiary mt-1">
-                          {formatRateLimits(
-                            key.rateLimits,
-                            key.provider,
-                            key.model
-                          )}
-                        </p>
-                      )}
+                      <p className="text-xs text-theme-text-tertiary mt-1">
+                        {formatRateLimits(
+                          key.rateLimits,
+                          key.provider,
+                          key.model
+                        )}
+                      </p>
                     </div>
                   </div>
 

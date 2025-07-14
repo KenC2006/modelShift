@@ -10,6 +10,9 @@ import {
   X,
   User,
   ChevronDown,
+  Bot,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -24,7 +27,15 @@ const Layout = ({ children }) => {
       await logout();
       toast.success("Successfully logged out");
     } catch (error) {
-      toast.error("Failed to log out");
+      if (error.code === "auth/network-request-failed") {
+        toast.error(
+          "Network error. Please check your connection and try again."
+        );
+      } else if (error.code === "auth/internal-error") {
+        toast.error("Internal error. Please try again later.");
+      } else {
+        toast.error("Failed to log out. Please try again.");
+      }
     }
   };
 
@@ -43,11 +54,15 @@ const Layout = ({ children }) => {
             <div className="flex items-center">
               {/* Logo */}
               <Link to="/" className="flex items-center">
-                <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white text-sm font-bold">MS</span>
+                <div className="h-8 w-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center shadow-md">
+                  <div className="relative">
+                    <Bot className="h-4 w-4 text-white" />
+                    <Sparkles className="h-2 w-2 text-yellow-300 absolute -top-0.5 -right-0.5" />
+                    <Zap className="h-1.5 w-1.5 text-blue-300 absolute -bottom-0.5 -left-0.5" />
+                  </div>
                 </div>
                 <span className="ml-2 text-xl font-bold text-theme-text">
-                  modelShift
+                  ModelShift
                 </span>
               </Link>
 

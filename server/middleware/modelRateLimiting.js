@@ -26,21 +26,28 @@ const checkRateLimits = async (
       if (selectedKey && selectedKey.rateLimits) {
         modelLimits = {
           requestsPerMinute:
-            selectedKey.rateLimits.requestsPerMinute ??
-            modelLimits.requestsPerMinute,
+            selectedKey.rateLimits.requestsPerMinute !== undefined &&
+            selectedKey.rateLimits.requestsPerMinute !== null
+              ? selectedKey.rateLimits.requestsPerMinute
+              : modelLimits.requestsPerMinute,
           requestsPerDay:
-            selectedKey.rateLimits.requestsPerDay ?? modelLimits.requestsPerDay,
+            selectedKey.rateLimits.requestsPerDay !== undefined &&
+            selectedKey.rateLimits.requestsPerDay !== null
+              ? selectedKey.rateLimits.requestsPerDay
+              : modelLimits.requestsPerDay,
           tokensPerMinute:
-            selectedKey.rateLimits.tokensPerMinute ??
-            modelLimits.tokensPerMinute,
+            selectedKey.rateLimits.tokensPerMinute !== undefined &&
+            selectedKey.rateLimits.tokensPerMinute !== null
+              ? selectedKey.rateLimits.tokensPerMinute
+              : modelLimits.tokensPerMinute,
           maxTokensPerRequest:
-            selectedKey.rateLimits.maxTokensPerRequest ??
-            modelLimits.maxTokensPerRequest,
+            selectedKey.rateLimits.maxTokensPerRequest !== undefined &&
+            selectedKey.rateLimits.maxTokensPerRequest !== null
+              ? selectedKey.rateLimits.maxTokensPerRequest
+              : modelLimits.maxTokensPerRequest,
         };
       }
-    } catch (error) {
-      console.error("Error getting custom rate limits:", error);
-    }
+    } catch (error) {}
   }
 
   const minuteKey = Math.floor(now / 60000);
