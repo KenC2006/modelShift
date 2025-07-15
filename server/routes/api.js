@@ -63,6 +63,8 @@ router.post(
 
       let selectedKey = null;
       if (keyId) {
+        // When a specific keyId is provided, use that exact key
+        // This prevents fallback to other keys when user wants a specific key's response
         selectedKey = activeKeys.find((key) => key.id === keyId);
         if (!selectedKey) {
           return res.status(400).json({
@@ -71,6 +73,7 @@ router.post(
           });
         }
       } else {
+        // When no keyId is provided, use automatic key selection with fallback capability
         selectedKey = selectBestKey(activeKeys);
       }
 
@@ -126,7 +129,9 @@ router.post(
       } catch (apiError) {
         error = apiError;
 
-        if (activeKeys.length > 1) {
+        // Only use fallback logic when no specific keyId is requested
+        // This prevents copying responses from other keys when user wants a specific key
+        if (!keyId && activeKeys.length > 1) {
           const otherKeys = activeKeys.filter(
             (key) => key.id !== selectedKey.id
           );
@@ -182,10 +187,19 @@ router.post(
       await updateUsageStats(userId, selectedKey.id, tokensUsed, error ? 1 : 0);
 
       if (error) {
+        // Parse and format the error message for better user experience
+        const formattedError = formatAIError(
+          error,
+          selectedKey.provider,
+          selectedKey.model
+        );
+
         return res.status(500).json({
           error: "AI Provider Error",
-          message: error.message || "Failed to get response from AI provider",
+          message: formattedError,
           provider: selectedKey.provider,
+          keyName: selectedKey.name,
+          keyId: selectedKey.id,
         });
       }
 
@@ -409,6 +423,106 @@ async function updateUsageStats(userId, keyId, tokensUsed, errors = 0) {
       apiKeys: apiKeys,
     });
   } catch (error) {}
+}
+
+function formatAIError(error, provider, model) {
+  const errorMessage = error.message || error.toString();
+
+  // Handle different provider-specific error patterns
+  switch (provider) {
+    case "openai":
+      return formatOpenAIError(errorMessage, model);
+    case "gemini":
+      return formatGeminiError(errorMessage, model);
+    case "claude":
+      return formatClaudeError(errorMessage, model);
+    default:
+      return formatGenericError(errorMessage, provider, model);
+  }
+}
+
+function formatOpenAIError(errorMessage, model) {
+  // Common OpenAI error patterns
+  if (errorMessage.includes("API key")) {
+    return "Invalid OpenAI API key. Please check your API key and try again.";
+  }
+  if (errorMessage.includes("quota") || errorMessage.includes("billing")) {
+    return "OpenAI quota exceeded or billing issue. Please check your OpenAI account.";
+  }
+  if (errorMessage.includes("model") || errorMessage.includes("not found")) {
+    return `Model "${model}" not found or not available. Please check the model name.`;
+  }
+  if (errorMessage.includes("rate limit")) {
+    return "OpenAI rate limit exceeded. Please wait a moment and try again.";
+  }
+  if (errorMessage.includes("context length")) {
+    return "Message too long for this model. Please shorten your message.";
+  }
+
+  return `OpenAI Error: ${errorMessage}`;
+}
+
+function formatGeminiError(errorMessage, model) {
+  // Common Gemini error patterns
+  if (
+    errorMessage.includes("API key not valid") ||
+    errorMessage.includes("API_KEY_INVALID")
+  ) {
+    return "Invalid Google API key. Please check your API key and try again.";
+  }
+  if (errorMessage.includes("quota") || errorMessage.includes("billing")) {
+    return "Google AI quota exceeded or billing issue. Please check your Google Cloud account.";
+  }
+  if (errorMessage.includes("model") || errorMessage.includes("not found")) {
+    return `Model "${model}" not found or not available. Please check the model name.`;
+  }
+  if (errorMessage.includes("rate limit") || errorMessage.includes("quota")) {
+    return "Google AI rate limit exceeded. Please wait a moment and try again.";
+  }
+  if (errorMessage.includes("content") || errorMessage.includes("safety")) {
+    return "Content blocked by Google AI safety filters. Please modify your message.";
+  }
+
+  return `Google AI Error: ${errorMessage}`;
+}
+
+function formatClaudeError(errorMessage, model) {
+  // Common Claude error patterns
+  if (
+    errorMessage.includes("API key") ||
+    errorMessage.includes("authentication")
+  ) {
+    return "Invalid Anthropic API key. Please check your API key and try again.";
+  }
+  if (errorMessage.includes("quota") || errorMessage.includes("billing")) {
+    return "Anthropic quota exceeded or billing issue. Please check your Anthropic account.";
+  }
+  if (errorMessage.includes("model") || errorMessage.includes("not found")) {
+    return `Model "${model}" not found or not available. Please check the model name.`;
+  }
+  if (errorMessage.includes("rate limit")) {
+    return "Anthropic rate limit exceeded. Please wait a moment and try again.";
+  }
+  if (errorMessage.includes("content") || errorMessage.includes("safety")) {
+    return "Content blocked by Anthropic safety filters. Please modify your message.";
+  }
+
+  return `Anthropic Error: ${errorMessage}`;
+}
+
+function formatGenericError(errorMessage, provider, model) {
+  // Generic error formatting
+  if (errorMessage.includes("API key")) {
+    return `Invalid ${provider} API key. Please check your API key and try again.`;
+  }
+  if (errorMessage.includes("network") || errorMessage.includes("connection")) {
+    return `Network error connecting to ${provider}. Please check your internet connection.`;
+  }
+  if (errorMessage.includes("timeout")) {
+    return `${provider} request timed out. Please try again.`;
+  }
+
+  return `${provider} Error: ${errorMessage}`;
 }
 
 module.exports = router;

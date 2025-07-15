@@ -135,7 +135,12 @@ const ComparisonResult = ({ result }) => {
             <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
             <span className="font-medium">Error</span>
           </div>
-          <p>{result.content}</p>
+          <p className="text-sm leading-relaxed">{result.content}</p>
+          <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-700">
+            <p className="text-xs text-red-500 dark:text-red-400">
+              💡 Tip: Check your API key settings or try again later.
+            </p>
+          </div>
         </div>
       );
     }

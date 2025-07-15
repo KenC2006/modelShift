@@ -102,10 +102,19 @@ const AIComparison = () => {
             data: response.data,
           };
         } catch (error) {
+          const errorMessage = error.response?.data?.message || error.message;
+          const keyName = error.response?.data?.keyName;
+
+          // Create a more specific error message for key-specific failures
+          let specificError = errorMessage;
+          if (keyName && error.response?.data?.keyId) {
+            specificError = `Key "${keyName}": ${errorMessage}`;
+          }
+
           return {
             keyId,
             success: false,
-            error: error.response?.data?.message || error.message,
+            error: specificError,
           };
         }
       });
