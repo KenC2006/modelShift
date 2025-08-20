@@ -1,6 +1,6 @@
 # modelShift - AI Comparison Tool
 
-A powerful web application that allows you to compare responses from multiple AI models side by side. Send the same prompt to different AI providers and see how they respond differently.
+Allows you to compare responses from multiple AI models side by side by sending the same prompt to different AI APIs and see how they respond differently.
 
 ## Features
 
